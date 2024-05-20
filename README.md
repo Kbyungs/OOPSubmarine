@@ -6,7 +6,8 @@
 <div markdown="1">
   
 - [ ] USERNAME, IP 처음에 입력받기
-- [ ] GUI 만들기
+- [ ] GUI 만들기 (더 자세히 써야 함)
+- [ ] 로그인 (시간 남으면)
 
 </div>
 </details>
