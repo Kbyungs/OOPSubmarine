@@ -14,7 +14,7 @@ public class SubmarineServer {
     public static int maxPlayer=2;
     public static int numPlayer=0;
     public static int width=10;
-    public static int num_mine=10;
+    public static int num_trs=10;
     public static Map map;
 
 
@@ -40,8 +40,16 @@ public class SubmarineServer {
             System.out.println("  - "+c.userName);
         }
 
-        map = new Map(width, num_mine);
+        map = new Map(width, num_trs);
         sendtoall("Start Game");
+
+        //양 팀 지뢰 매설 시작
+//        while(true) {
+//            if (allTurn()) {
+//                sendtoall("지뢰를 매설해주세요");
+//
+//            }
+//        }
 
         while(true) {
             if (allTurn()) {
