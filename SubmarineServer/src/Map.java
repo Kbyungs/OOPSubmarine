@@ -5,42 +5,42 @@ import java.util.Random;
 
 public class Map {
     int width;
-    int num_mine;
-    int[][] mineMap;
-    int[][] displayMap;
-    HashMap<Integer, Integer> minePosition;
+    int num_trs; //treasure
+    String [][] mineMap;
+    String [][] displayMap;
+    HashMap<Integer, Integer> trsPosition;
 
-    public Map(int width, int num_mine) {
+    public Map(int width, int num_trs) {
         this.width = width;
-        this.num_mine = num_mine;
+        this.num_trs = num_trs;
 
         // create map
         System.out.println("Create  "+ width+" X "+ width + "  map");
-        mineMap = new int[width][width];
-        displayMap = new int[width][width];
+        mineMap = new String [width][width];
+        displayMap = new String [width][width];
         for (int i=0; i<width*width; i++) {
-            mineMap[i/width][i%width] = 0;
-            displayMap[i/width][i%width] = 0;
+            mineMap[i/width][i%width] = "0";
+            displayMap[i/width][i%width] = "0";
         }
 
         // create mines
-        System.out.println("Create  "+num_mine+"  mines");
+        System.out.println("Create  "+num_trs+"  mines");
         Random r = new Random();
-        minePosition = new HashMap<>();
-        for (int i = 0; i < num_mine; i++) {
+        trsPosition = new HashMap<>();
+        for (int i = 0; i < num_trs; i++) {
             int position = r.nextInt(width * width);
-            while (minePosition.containsValue(position))   // check repetition
+            while (trsPosition.containsValue(position))   // check repetition
                 position = r.nextInt(width * width);
-            minePosition.put(i, position);
+            trsPosition.put(i, position);
         }
 
         // deploy mines
         System.out.println("mine positions");
-        for (int i = 0; i < num_mine; i++) {
-            int x = minePosition.get(i) / width;
-            int y = minePosition.get(i) % width;
+        for (int i = 0; i < num_trs; i++) {
+            int x = trsPosition.get(i) / width;
+            int y = trsPosition.get(i) % width;
             System.out.println(x+", "+y);
-            mineMap[x][y] = 1;
+            mineMap[x][y] = "1";
         }
 
         printMap(mineMap);
@@ -50,7 +50,7 @@ public class Map {
     public int checkMine(int x, int y) {
         int pos = (x*width) + y;
 
-        if (minePosition.containsValue(pos)) {
+        if (trsPosition.containsValue(pos)) {
             //System.out.println("   Find mine at ("+x+", "+y+")");
             return pos;
         }
@@ -61,7 +61,7 @@ public class Map {
 
     }
 
-    public void printMap(int[][] a) {
+    public void printMap(String [][] a) {
         System.out.println();
         for (int i = 0; i < a.length; i++) {
             System.out.print(a[i][0]);
@@ -72,7 +72,7 @@ public class Map {
     }
 
     public void updateMap(int x, int y) {
-        displayMap[x][y]=1;
+        displayMap[x][y] = "1";
 //		printMap(displayMap);
     }
 
