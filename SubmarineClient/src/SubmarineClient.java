@@ -35,13 +35,14 @@ class SubmarineClient {
         System.out.println("입력완료");
 
         try (Socket socket = new Socket(address, inPort)) {
-            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            ObjectOutputStream objectOut = new ObjectOutputStream(socket.getOutputStream());
 
             System.out.println("Welcome!");
-            out.writeObject(userName);
-            out.writeObject(mines); // 2D 배열 전송
-            out.flush();
+            objectOut.writeObject(userName);
+            objectOut.writeObject(mines); // 2D 배열 전송
+            objectOut.flush();
 
             msg = in.readLine(); // wait message
             System.out.println(msg);
@@ -54,11 +55,20 @@ class SubmarineClient {
                 if (msg.equalsIgnoreCase("ok")) {
                     msg = in.readLine();
                     int result = Integer.parseInt(msg);
-                    if (result >= 0) {
+//                    if (result >= 0) {
+//                        score++;
+//                        System.out.println("hit , score = " + score);
+//                    } else
+//                        System.out.println("miss , score = " + score);
+                    if (result == 99) {
                         score++;
-                        System.out.println("hit , score = " + score);
-                    } else
-                        System.out.println("miss , score = " + score);
+                        System.out.println("find Treasure!");
+                    } else if (result == 98) {
+                        score--;
+                        System.out.println("hit the bomb..");
+                    } else {
+                        System.out.println("[hint] nearby : " + result);
+                    }
                 }
             }
             in.close();
@@ -69,7 +79,7 @@ class SubmarineClient {
         }
     }
 
-    public static String guess(BufferedReader in, ObjectOutputStream out) throws IOException {
+    public static String guess(BufferedReader in, PrintWriter out) throws IOException {
         Scanner scan = new Scanner(System.in);
 
         System.out.print("\nEnter x coordinate: ");
@@ -86,8 +96,7 @@ class SubmarineClient {
         }
 
         System.out.println("wait for turn");
-        out.writeObject(new int[]{x, y}); // 좌표 전송
-        out.flush();
+        out.println(x + "," + y); // 좌표를 문자열로 전송
         String msg = in.readLine();
 
         return msg;
