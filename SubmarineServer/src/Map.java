@@ -40,25 +40,31 @@ public class Map {
             int x = trsPosition.get(i) / width;
             int y = trsPosition.get(i) % width;
             System.out.println(x+", "+y);
-            mineMap[x][y] = "1";
+            mineMap[x][y] = "T";
+            displayMap[x][y] = "s"; //something
         }
 
-        printMap(mineMap);
+//        printMap(mineMap);
 
     }
 
-    public int checkMine(int x, int y) {
-        int pos = (x*width) + y;
+    public int checkMine(int r, int c) {
+//        int pos = (r*width) + c;
+//        if (trsPosition.containsValue(pos)) {
+//            //System.out.println("   Find mine at ("+x+", "+y+")");
+//            return pos;
+//        }
+//        else {
+//            //System.out.println("   No mine at ("+x+", "+y+")");
+//            return -1;
+//        }
 
-        if (trsPosition.containsValue(pos)) {
-            //System.out.println("   Find mine at ("+x+", "+y+")");
-            return pos;
+        if (displayMap[r][c] == "s") {
+            if (mineMap[r][c] == "T") return 99; // 보물발견
+            else return 98; //지뢰밟음
+        } else {
+            return Integer.parseInt(mineMap[r][c]); // 아니면 힌트숫자 주기
         }
-        else {
-            //System.out.println("   No mine at ("+x+", "+y+")");
-            return -1;
-        }
-
     }
 
     public void printMap(String [][] a) {
@@ -76,5 +82,29 @@ public class Map {
 //		printMap(displayMap);
     }
 
+    public void deployMine(int x, int y, String s) {
+        mineMap[x][y] = s;
+    }
+
+    public String numSomething(int r, int c){
+        if (displayMap[r][c] == "s")
+            return mineMap[r][c];
+        int nearby = 0;
+        int[] dx = new int[] {0, 0, 1, -1, 1, -1, 1, -1};
+        int[] dy = new int[] {1, -1, 0, 0, 1, -1, -1, 1};
+        for (int i = 0; i < 8; i++) {
+            int newRow = r + dx[i];
+            int newCol = c + dy[i];
+            if (newRow >= 0 && newRow < width && newCol >= 0 && newCol < width) {
+                if (displayMap[newRow][newCol] == "s") nearby++;
+            }
+        }
+        return String.valueOf(nearby);
+    }
+
+    public void numbering() {
+        for (int i = 0; i < width*width; i++)
+            mineMap[i/width][i%width] = numSomething(i/width, i%width);
+    }
 
 }
