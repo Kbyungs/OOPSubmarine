@@ -3,13 +3,10 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.Scanner;
 
 public class SubmarineClient extends JFrame {
     private JTextArea textArea;
-    private JTextField xCoordField;
-    private JTextField yCoordField;
-    private JButton sendButton;
+    private JButton[][] buttons;
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
@@ -24,42 +21,25 @@ public class SubmarineClient extends JFrame {
         // GUI 구성 요소 초기화
         textArea = new JTextArea();
         textArea.setEditable(false);
-        xCoordField = new JTextField(5);
-        yCoordField = new JTextField(5);
-        sendButton = new JButton("Send");
+        buttons = new JButton[width][width];
 
         // 레이아웃 설정
-        JPanel panel = new JPanel();
-        panel.add(new JLabel("X:"));
-        panel.add(xCoordField);
-        panel.add(new JLabel("Y:"));
-        panel.add(yCoordField);
-        panel.add(sendButton);
+        JPanel gridPanel = new JPanel(new GridLayout(width, width));
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j] = new JButton();
+                buttons[i][j].addActionListener(new ButtonListener(i, j));
+                gridPanel.add(buttons[i][j]);
+            }
+        }
 
         setLayout(new BorderLayout());
         add(new JScrollPane(textArea), BorderLayout.CENTER);
-        add(panel, BorderLayout.SOUTH);
-
-        // 이벤트 핸들러 설정
-        sendButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                sendCoordinates();
-            }
-        });
-        xCoordField.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                sendCoordinates();
-            }
-        });
-        yCoordField.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                sendCoordinates();
-            }
-        });
+        add(gridPanel, BorderLayout.SOUTH);
 
         // 창 설정
         setTitle("Submarine Client GUI");
-        setSize(400, 300);
+        setSize(600, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setVisible(true);
 
@@ -77,25 +57,9 @@ public class SubmarineClient extends JFrame {
         connectToServer();
     }
 
-    private void sendCoordinates() {
-        try {
-            int x = Integer.parseInt(xCoordField.getText());
-            int y = Integer.parseInt(yCoordField.getText());
-            if ((x < 0) || (x >= width) || (y < 0) || (y >= width)) {
-                textArea.append("Invalid coordinates. Try again.\n");
-                return;
-            }
-            out.println(x + "," + y);
-            xCoordField.setText("");
-            yCoordField.setText("");
-        } catch (NumberFormatException e) {
-            textArea.append("Invalid input. Please enter valid coordinates.\n");
-        }
-    }
-
     private void connectToServer() {
         try {
-            socket = new Socket("localhost", 9999); // 변경 필요: 올바른 IP 및 포트 설정
+            socket = new Socket("192.168.0.104", 9999); // 변경 필요: 올바른 IP 및 포트 설정
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             objectOut = new ObjectOutputStream(socket.getOutputStream());
@@ -113,6 +77,7 @@ public class SubmarineClient extends JFrame {
                         while ((message = in.readLine()) != null) {
                             textArea.append(message + "\n");
                             if (message.equals("Game Over") || message.contains("has died")) {
+                                disableAllButtons(); // 게임 종료 시 버튼 비활성화
                                 break; // 게임 종료 시 루프 탈출
                             }
                         }
@@ -123,6 +88,32 @@ public class SubmarineClient extends JFrame {
             }).start();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void sendCoordinates(int x, int y) {
+        out.println(x + "," + y);
+    }
+
+    private void disableAllButtons() {
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j].setEnabled(false);
+            }
+        }
+    }
+
+    private class ButtonListener implements ActionListener {
+        private int x, y;
+
+        public ButtonListener(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            sendCoordinates(x, y);
+            buttons[x][y].setEnabled(false); // 클릭된 버튼 비활성화
         }
     }
 
