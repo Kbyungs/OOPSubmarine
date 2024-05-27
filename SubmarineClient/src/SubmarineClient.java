@@ -1,104 +1,132 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.*;
+import java.util.Scanner;
 
-class SubmarineClient {
-    static int inPort = 9999;
-    static String address = "192.168.0.6";
-    static String userName = "Alice";
-    static int num_trs = 10;
-    static int num_mine = 3;
+public class SubmarineClient extends JFrame {
+    private JTextArea textArea;
+    private JTextField xCoordField;
+    private JTextField yCoordField;
+    private JButton sendButton;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+    private ObjectOutputStream objectOut;
 
-    static String[][] mines;
-    static int width = 9;
+    private String userName;
+    private String[][] mines;
+    private static final int num_mine = 3;
+    private static final int width = 9;
 
-    public static void main(String[] args) {
-        int score = 0;
-        String msg;
-        Scanner sc = new Scanner(System.in);
+    public SubmarineClient() {
+        // GUI 구성 요소 초기화
+        textArea = new JTextArea();
+        textArea.setEditable(false);
+        xCoordField = new JTextField(5);
+        yCoordField = new JTextField(5);
+        sendButton = new JButton("Send");
 
-        System.out.print("Please enter IP: ");
-        address = sc.nextLine(); // IP 주소 입력
+        // 레이아웃 설정
+        JPanel panel = new JPanel();
+        panel.add(new JLabel("X:"));
+        panel.add(xCoordField);
+        panel.add(new JLabel("Y:"));
+        panel.add(yCoordField);
+        panel.add(sendButton);
 
-        System.out.print("Please enter UserName: ");
-        userName = sc.nextLine(); // username 입력
+        setLayout(new BorderLayout());
+        add(new JScrollPane(textArea), BorderLayout.CENTER);
+        add(panel, BorderLayout.SOUTH);
 
+        // 이벤트 핸들러 설정
+        sendButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                sendCoordinates();
+            }
+        });
+        xCoordField.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                sendCoordinates();
+            }
+        });
+        yCoordField.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                sendCoordinates();
+            }
+        });
+
+        // 창 설정
+        setTitle("Submarine Client GUI");
+        setSize(400, 300);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setVisible(true);
+
+        // 사용자 이름 및 지뢰 입력 받기
+        userName = JOptionPane.showInputDialog(this, "Enter your username:");
         mines = new String[num_mine][2];
-        System.out.println("Let's plant a Mine!");
-        System.out.println("ex) \"2,3\" without space only comma");
-        for (int i = 0; i < num_mine; i++) { // 지뢰 매설
-            String[] temp = sc.nextLine().split(",");
+        for (int i = 0; i < num_mine; i++) {
+            String input = JOptionPane.showInputDialog(this, "Enter mine coordinates (x,y) for mine " + (i + 1) + ":");
+            String[] temp = input.split(",");
             for (int j = 0; j < 2; j++)
                 mines[i][j] = temp[j];
         }
 
-        System.out.println("입력완료");
+        // 서버와 연결
+        connectToServer();
+    }
 
-        try (Socket socket = new Socket(address, inPort)) {
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            ObjectOutputStream objectOut = new ObjectOutputStream(socket.getOutputStream());
+    private void sendCoordinates() {
+        try {
+            int x = Integer.parseInt(xCoordField.getText());
+            int y = Integer.parseInt(yCoordField.getText());
+            if ((x < 0) || (x >= width) || (y < 0) || (y >= width)) {
+                textArea.append("Invalid coordinates. Try again.\n");
+                return;
+            }
+            out.println(x + "," + y);
+            xCoordField.setText("");
+            yCoordField.setText("");
+        } catch (NumberFormatException e) {
+            textArea.append("Invalid input. Please enter valid coordinates.\n");
+        }
+    }
 
-            System.out.println("Welcome!");
+    private void connectToServer() {
+        try {
+            socket = new Socket("localhost", 9999); // 변경 필요: 올바른 IP 및 포트 설정
+            out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            objectOut = new ObjectOutputStream(socket.getOutputStream());
+
+            // 사용자 이름 및 지뢰 정보를 서버로 전송
             objectOut.writeObject(userName);
-            objectOut.writeObject(mines); // 2D 배열 전송
+            objectOut.writeObject(mines);
             objectOut.flush();
 
-            msg = in.readLine(); // wait message
-            System.out.println(msg);
-            msg = in.readLine(); // start message
-            System.out.println(msg);
-
-            while (score <= num_trs) {
-                msg = guess(in, out);
-
-                if (msg.equalsIgnoreCase("ok")) {
-                    msg = in.readLine();
-                    int result = Integer.parseInt(msg);
-//                    if (result >= 0) {
-//                        score++;
-//                        System.out.println("hit , score = " + score);
-//                    } else
-//                        System.out.println("miss , score = " + score);
-                    if (result == 99) {
-                        score++;
-                        System.out.println("find Treasure!");
-                    } else if (result == 98) {
-                        score--;
-                        System.out.println("hit the bomb..");
-                    } else {
-                        System.out.println("[hint] nearby : " + result);
+            // 서버 메시지 수신 스레드 시작
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        String message;
+                        while ((message = in.readLine()) != null) {
+                            textArea.append(message + "\n");
+                            if (message.equals("Game Over") || message.contains("has died")) {
+                                break; // 게임 종료 시 루프 탈출
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
-            }
-            in.close();
-            out.close();
-            socket.close();
-        } catch (Exception e) {
+            }).start();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static String guess(BufferedReader in, PrintWriter out) throws IOException {
-        Scanner scan = new Scanner(System.in);
-
-        System.out.print("\nEnter x coordinate: ");
-        int x = scan.nextInt();
-        while ((x < 0) || (x >= width)) {
-            System.out.println("Invalid x, enter a new x coordinate");
-            x = scan.nextInt();
-        }
-        System.out.print("Enter y coordinate: ");
-        int y = scan.nextInt();
-        while ((y < 0) || (y >= width)) {
-            System.out.println("Invalid y, enter a new y coordinate");
-            y = scan.nextInt();
-        }
-
-        System.out.println("wait for turn");
-        out.println(x + "," + y); // 좌표를 문자열로 전송
-        String msg = in.readLine();
-
-        return msg;
+    public static void main(String[] args) {
+        new SubmarineClient();
     }
 }
