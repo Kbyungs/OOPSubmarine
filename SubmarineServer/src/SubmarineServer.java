@@ -1,141 +1,189 @@
-// enjoy submarine detection game
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
 import java.util.Vector;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Scanner;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 
 public class SubmarineServer {
     public static int inPort = 9999;
     public static Vector<Client> clients = new Vector<Client>();
-    public static int maxPlayer=2;
-    public static int numPlayer=0;
-    public static int width=10;
-    public static int num_mine=10;
+    public static int maxPlayer = 2;
+    public static int numPlayer = 0;
+    public static int width = 10;
+    public static int num_trs = 10;
+    public static int num_mine = 3;
     public static Map map;
-
 
     public static void main(String[] args) throws Exception {
         new SubmarineServer().createServer();
     }
 
-
     public void createServer() throws Exception {
         System.out.println("Server start running ..");
         ServerSocket server = new ServerSocket(inPort);
 
-        numPlayer=0;
-        while (numPlayer<maxPlayer) {
+        numPlayer = 0;
+        while (numPlayer < maxPlayer) {
             Socket socket = server.accept();
             Client c = new Client(socket);
             clients.add(c);
             numPlayer++;
         }
-        System.out.println("\n"+numPlayer+" players join");
-        for(Client c:clients) {
+        System.out.println("\n" + numPlayer + " players join");
+        for (Client c : clients) {
             c.turn = true;
-            System.out.println("  - "+c.userName);
+            System.out.println("  - " + c.userName);
         }
 
-        map = new Map(width, num_mine);
-        sendtoall("Start Game");
+        map = new Map(width, num_trs);
 
-        while(true) {
-            if (allTurn()) {
-                System.out.println();
-
-                for(Client c : clients) {
-                    int check=map.checkMine(c.x, c.y);
-                    if (check>=0) {
-                        System.out.println(c.userName + " hit at (" + c.x+" , "+c.y+")");
-                        map.updateMap(c.x, c.y);
-                    }
-                    else
-                        System.out.println(c.userName + " miss at (" + c.x+" , "+c.y+")");
-
-                    c.send(""+check);
-                    c.turn=true;
-                }
-
+        for (Client c : clients) {
+            for (int i = 0; i < num_mine; i++) {
+                int x = Integer.parseInt(c.mines[i][0]);
+                int y = Integer.parseInt(c.mines[i][1]);
+                map.deployMine(x, y, c.userName.substring(0, 1));
+                map.displayMap[x][y] = "s";
             }
         }
 
+        map.numbering();
+        map.printMap(map.mineMap);
+
+        sendtoall("Start Game");
+        
+        // 1단계 진행
+        // 플레이어 1(방장), 플레이어 2에게 각각 메시지 전송
+        clients.get(0).send("당신은 방장입니다. 잠시 후 게임 난이도를 선택해주세요");
+        clients.get(1).send("방장이 게임 난이도를 설정하고 있습니다..");
+        
+        // 플레이어 1의 난이도 선택 과정 진행
+        
+        String level = clients.get(0).selectDifficulty();
+        
+        // 난이도 선택 완료
+        sendtoall("난이도 선택이 완료되었습니다. 선택된 난이도는 " + level + "입니다.");
+        
+        
+        // 2단계 진행
+
+        while (true) {
+            if (allTurn()) {
+                System.out.println();
+
+                for (Client c : clients) {
+                    int check = map.checkMine(c.x, c.y);
+//                    if (check >= 0) {
+//                        System.out.println(c.userName + " hit at (" + c.x + " , " + c.y + ")");
+//                        map.updateMap(c.x, c.y);
+//                    } else
+//                        System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
+
+                    if (check == 99) {  // 보물발견
+                        System.out.println(c.userName + " find treasure at (" + c.x + ", " + c.y + ")");
+                        if (c.hp < 3) c.hp++;
+                        System.out.println(c.userName + "'s hp : " + c.hp);
+                    } else if (check == 98) {// 지뢰밟음
+                        if (!map.mineMap[c.x][c.y].equals(c.userName.substring(0,1))) { //본인지뢰는 pass
+                            System.out.println(c.userName + " hit the bomb at (" + c.x + ", " + c.y + ")");
+                            c.hp--;
+                        }
+                        System.out.println(c.userName + "'s hp : " + c.hp);
+                    } else { //아무것도 못찾음
+                        System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
+                    }
+                    map.updateMap(c.x,c.y);
+                    c.send("" + check);
+                    c.turn = true;
+                }
+            }
+        }
     }
 
-
     public void sendtoall(String msg) {
-        for(Client c : clients)
+        for (Client c : clients)
             c.send(msg);
     }
 
-
     public boolean allTurn() {
-        int i=0;
-        for(Client c:clients)
-            if (c.turn == false)
+        int i = 0;
+        for (Client c : clients)
+            if (!c.turn)
                 i++;
-
-        if (i==clients.size()) return true;
-        else return false;
+        return i == clients.size();
     }
-
 
     class Client extends Thread {
         Socket socket;
         PrintWriter out = null;
         BufferedReader in = null;
-        Map map;
         String userName = null;
+        String[][] mines = null;
+        
+        public JButton[] buttons;
+        
         int x, y;
-        public boolean turn=false;
-
+        int hp = 3;
+        public boolean turn = false;
 
         public Client(Socket socket) throws Exception {
             initial(socket);
             start();
         }
 
-
-        public void initial(Socket socket) throws IOException {
+        public void initial(Socket socket) throws IOException, ClassNotFoundException {
             this.socket = socket;
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            ObjectInputStream objectInput = new ObjectInputStream(socket.getInputStream());
 
-            userName = in.readLine();
-            System.out.println(userName+" joins from  "+socket.getInetAddress());
+            userName = (String) objectInput.readObject();
+            mines = (String[][]) objectInput.readObject(); // 2D 배열 수신
+            System.out.println(userName + " joins from  " + socket.getInetAddress());
+            System.out.println("수신한 지뢰 배열: ");
+            for (int i = 0; i < mines.length; i++) {
+                for (int j = 0; j < mines[i].length; j++) {
+                    System.out.print(mines[i][j] + " ");
+                }
+                System.out.println();
+            }
             send("Wait for other player..");
+            
+            
         }
-
 
         @Override
         public void run() {
             String msg;
 
             try {
-                while(true) {
+                while (true) {
                     msg = in.readLine();
                     if (turn) {
                         String[] arr = msg.split(",");
                         x = Integer.parseInt(arr[0]);
                         y = Integer.parseInt(arr[1]);
                         send("ok");
-                        turn=false;
+                        turn = false;
                     }
-
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            catch (IOException e) { }
         }
-
 
         public void send(String msg) {
             out.println(msg);
         }
-
     }
-
-
 }
