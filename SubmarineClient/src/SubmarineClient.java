@@ -1,209 +1,138 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.Vector;
 
-public class SubmarineServer {
-    public static int inPort = 9999;
-    public static Vector<Client> clients = new Vector<Client>();
-    public static int maxPlayer = 2;
-    public static int numPlayer = 0;
-    public static int width = 10;
-    public static int num_trs = 10;
-    public static int num_mine = 3;
-    public static Map map;
+public class SubmarineClient extends JFrame {
+    private JTextArea textArea;
+    private JButton[][] buttons;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+    private ObjectOutputStream objectOut;
 
-    public static void main(String[] args) throws Exception {
-        new SubmarineServer().createServer();
-    }
+    private String userName;
+    private String ip;
+    private String[][] mines;
+    private static final int num_mine = 3;
+    private static final int width = 9;
 
-    public void createServer() throws Exception {
-        System.out.println("Server start running ..");
-        ServerSocket server = new ServerSocket(inPort);
+    public SubmarineClient() {
+        // GUI 구성 요소 초기화
+        textArea = new JTextArea();
+        textArea.setEditable(false);
+        buttons = new JButton[width][width];
 
-        numPlayer = 0;
-        while (numPlayer < maxPlayer) {
-            Socket socket = server.accept();
-            Client c = new Client(socket);
-            clients.add(c);
-            numPlayer++;
-        }
-        System.out.println("\n" + numPlayer + " players join");
-        for (Client c : clients) {
-            c.turn = true;
-            System.out.println("  - " + c.userName);
-        }
-
-        map = new Map(width, num_trs);
-
-        for (Client c : clients) {
-            for (int i = 0; i < num_mine; i++) {
-                int x = Integer.parseInt(c.mines[i][0]);
-                int y = Integer.parseInt(c.mines[i][1]);
-                map.deployMine(x, y, c.userName.substring(0, 1));
+        // 레이아웃 설정
+        JPanel gridPanel = new JPanel(new GridLayout(width, width));
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j] = new JButton();
+                buttons[i][j].setPreferredSize(new Dimension(50, 50));
+                buttons[i][j].addActionListener(new ButtonListener(i, j));
+                gridPanel.add(buttons[i][j]);
             }
         }
 
-        map.numbering();
-        map.printMap(map.mineMap);
+        setLayout(new BorderLayout());
+        add(new JScrollPane(textArea), BorderLayout.CENTER);
+        add(gridPanel, BorderLayout.SOUTH);
 
-        sendtoall("Start Game");
+        // 창 설정
+        setTitle("MZ뢰찾기");
+        setSize(600, 600);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setVisible(true);
 
-
-        while (true) {
-            if (allTurn()) {
-                System.out.println();
-
-                for (Client c : clients) {
-                    if (!c.alive) {
-                        continue;
-                    }
-
-                    int check = map.checkMine(c.x, c.y);
-                    if (check >= 0) {
-                        System.out.println(c.userName + " hit at (" + c.x + " , " + c.y + ")");
-                        map.updateMap(c.x, c.y);
-                        c.hp -= 1; // HP 감소
-                        sendtoall(c.userName + " HP: " + c.hp); // HP 전송
-                        if (c.hp <= 0) {
-                            c.alive = false; // 클라이언트 사망 처리
-                            sendtoall(c.userName + " has died.");
-                            System.out.println(c.userName + " has died.");
-                            sendtoall("Game Over");
-                            System.out.println("Game Over");
-                            return; // 게임 종료
-                        }
-                    } else {
-                        System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
-                    }
-
-                    c.send("" + check);
-                    c.turn = true;
-                }
-            }
+        // 사용자 이름 및 지뢰 입력 받기
+        userName = JOptionPane.showInputDialog(this, "Enter your username:");
+        ip = JOptionPane.showInputDialog(this, "Enter IP:");
+        mines = new String[num_mine][2];
+        for (int i = 0; i < num_mine; i++) {
+            String input = JOptionPane.showInputDialog(this, "Enter mine coordinates (x,y) for mine " + (i + 1) + ":");
+            String[] temp = input.split(",");
+            for (int j = 0; j < 2; j++)
+                mines[i][j] = temp[j];
         }
+
+        // 서버와 연결
+        connectToServer();
     }
 
-    public void sendtoall(String msg) {
-        for (Client c : clients) {
-            c.send(msg);
-        }
-    }
-
-    public boolean allTurn() {
-        int i = 0;
-        for (Client c : clients) {
-            if (!c.turn) {
-                i++;
-            }
-        }
-        return i == clients.size();
-    }
-
-    class Client extends Thread {
-        Socket socket;
-        PrintWriter out = null;
-        BufferedReader in = null;
-        String userName = null;
-        String[][] mines = null;
-        int x, y;
-        int hp = 3; // 기본 HP 설정
-        boolean alive = true; // 클라이언트 생존 여부
-        public boolean turn = false;
-
-        public Client(Socket socket) throws Exception {
-            initial(socket);
-            start();
-        }
-
-        public void initial(Socket socket) throws IOException, ClassNotFoundException {
-            this.socket = socket;
+    private void connectToServer() {
+        try {
+            socket = new Socket(ip, 9999); // 변경 필요: 올바른 IP 및 포트 설정
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            ObjectInputStream objectInput = new ObjectInputStream(socket.getInputStream());
+            objectOut = new ObjectOutputStream(socket.getOutputStream());
 
-            userName = (String) objectInput.readObject();
-            mines = (String[][]) objectInput.readObject(); // 2D 배열 수신
-            System.out.println(userName + " joins from " + socket.getInetAddress());
-            System.out.println("수신한 지뢰 배열: ");
-            for (int i = 0; i < mines.length; i++) {
-                for (int j = 0; j < mines[i].length; j++) {
-                    System.out.print(mines[i][j] + " ");
-                }
-                System.out.println();
-            }
-            send("wait for other player..");
-        }
+            // 사용자 이름 및 지뢰 정보를 서버로 전송
+            objectOut.writeObject(userName);
+            objectOut.writeObject(mines);
+            objectOut.flush();
 
-        @Override
-        public void run() {
-            String msg;
-            try {
-                while (true) {
-                    msg = in.readLine();
-                    if (msg.startsWith("MOVE:")) {
-                        String[] parts = msg.substring(5).split(",");
-                        x = Integer.parseInt(parts[0]);
-                        y = Integer.parseInt(parts[1]);
-
-                        int check = map.checkMine(x, y);
-                        String value;
-                        if (check == 99) {
-                            value = "99"; // 보물
-                            updateHP(userName, 1); // 보물 찾으면 HP 증가
-                        } else if (check == 98) {
-                            value = "98"; // 지뢰
-                            updateHP(userName, -1); // 지뢰 밟으면 HP 감소
-                        } else {
-                            value = String.valueOf(check);
-                        }
-                        map.updateMap(x, y);
-                        sendtoall("UPDATE:" + x + "," + y + "," + value);
-                    } else {
-                        if (turn && alive) {
-                            try {
-                                String[] arr = msg.split(",");
-                                if (arr.length == 2 && isNumeric(arr[0]) && isNumeric(arr[1])) {
-                                    x = Integer.parseInt(arr[0]);
-                                    y = Integer.parseInt(arr[1]);
-                                    send("ok");
-                                    turn = false;
-                                } else {
-                                    send("Invalid input. Please enter valid coordinates.");
+            // 서버 메시지 수신 스레드 시작
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        String message;
+                        while ((message = in.readLine()) != null) {
+                            if (message.startsWith("UPDATE:")) {
+                                handleUpdate(message.substring(7));
+                            } else {
+                                textArea.append(message + "\n");
+                                if (message.equals("Game Over") || message.contains("has died")) {
+                                    disableAllButtons(); // 게임 종료 시 버튼 비활성화
+                                    break; // 게임 종료 시 루프 탈출
                                 }
-                            } catch (NumberFormatException e) {
-                                System.out.println("Invalid input: " + msg);
-                                send("Invalid input. Please enter valid coordinates.");
                             }
                         }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
+            }).start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleUpdate(String update) {
+        String[] parts = update.split(",");
+        int x = Integer.parseInt(parts[0]);
+        int y = Integer.parseInt(parts[1]);
+        String value = parts[2];
+        buttons[x][y].setText(value);
+        buttons[x][y].setEnabled(false);
+    }
+
+    private void sendCoordinates(int x, int y) {
+        out.println("MOVE:" + x + "," + y);
+    }
+
+    private void disableAllButtons() {
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j].setEnabled(false);
             }
         }
+    }
 
-        private void updateHP(String userName, int delta) {
-            for (Client c : clients) {
-                if (c.userName.equals(userName)) {
-                    c.hp += delta;
-                    sendtoall(c.userName + " HP: " + c.hp);
-                    if (c.hp <= 0) {
-                        c.alive = false;
-                        sendtoall(c.userName + " has died.");
-                        sendtoall("Game Over");
-                        System.out.println("Game Over");
-                        break;
-                    }
-                }
-            }
+    private class ButtonListener implements ActionListener {
+        private int x, y;
+
+        public ButtonListener(int x, int y) {
+            this.x = x;
+            this.y = y;
         }
 
-        public void send(String msg) {
-            out.println(msg);
+        public void actionPerformed(ActionEvent e) {
+            sendCoordinates(x, y);
         }
+    }
 
-        private boolean isNumeric(String str) {
-            return str != null && str.matches("\\d+");
-        }
+    public static void main(String[] args) {
+        new SubmarineClient();
     }
 }
