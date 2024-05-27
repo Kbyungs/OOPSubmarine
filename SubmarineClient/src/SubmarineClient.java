@@ -28,6 +28,7 @@ public class SubmarineClient extends JFrame {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < width; j++) {
                 buttons[i][j] = new JButton();
+                buttons[i][j].setPreferredSize(new Dimension(50, 50));
                 buttons[i][j].addActionListener(new ButtonListener(i, j));
                 gridPanel.add(buttons[i][j]);
             }
@@ -75,10 +76,14 @@ public class SubmarineClient extends JFrame {
                     try {
                         String message;
                         while ((message = in.readLine()) != null) {
-                            textArea.append(message + "\n");
-                            if (message.equals("Game Over") || message.contains("has died")) {
-                                disableAllButtons(); // 게임 종료 시 버튼 비활성화
-                                break; // 게임 종료 시 루프 탈출
+                            if (message.startsWith("UPDATE:")) {
+                                handleUpdate(message.substring(7));
+                            } else {
+                                textArea.append(message + "\n");
+                                if (message.equals("Game Over") || message.contains("has died")) {
+                                    disableAllButtons(); // 게임 종료 시 버튼 비활성화
+                                    break; // 게임 종료 시 루프 탈출
+                                }
                             }
                         }
                     } catch (IOException e) {
@@ -91,8 +96,17 @@ public class SubmarineClient extends JFrame {
         }
     }
 
+    private void handleUpdate(String update) {
+        String[] parts = update.split(",");
+        int x = Integer.parseInt(parts[0]);
+        int y = Integer.parseInt(parts[1]);
+        String value = parts[2];
+        buttons[x][y].setText(value);
+        buttons[x][y].setEnabled(false);
+    }
+
     private void sendCoordinates(int x, int y) {
-        out.println(x + "," + y);
+        out.println("MOVE:" + x + "," + y);
     }
 
     private void disableAllButtons() {
@@ -113,7 +127,6 @@ public class SubmarineClient extends JFrame {
 
         public void actionPerformed(ActionEvent e) {
             sendCoordinates(x, y);
-            buttons[x][y].setEnabled(false); // 클릭된 버튼 비활성화
         }
     }
 
