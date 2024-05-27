@@ -40,7 +40,6 @@ public class SubmarineServer {
                 int x = Integer.parseInt(c.mines[i][0]);
                 int y = Integer.parseInt(c.mines[i][1]);
                 map.deployMine(x, y, c.userName.substring(0, 1));
-                map.displayMap[x][y] = "s";
             }
         }
 
@@ -49,32 +48,34 @@ public class SubmarineServer {
 
         sendtoall("Start Game");
 
+
         while (true) {
             if (allTurn()) {
                 System.out.println();
 
                 for (Client c : clients) {
-                    int check = map.checkMine(c.x, c.y);
-//                    if (check >= 0) {
-//                        System.out.println(c.userName + " hit at (" + c.x + " , " + c.y + ")");
-//                        map.updateMap(c.x, c.y);
-//                    } else
-//                        System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
+                    if (!c.alive) {
+                        continue;
+                    }
 
-                    if (check == 99) {  // 보물발견
-                        System.out.println(c.userName + " find treasure at (" + c.x + ", " + c.y + ")");
-                        if (c.hp < 3) c.hp++;
-                        System.out.println(c.userName + "'s hp : " + c.hp);
-                    } else if (check == 98) {// 지뢰밟음
-                        if (!map.mineMap[c.x][c.y].equals(c.userName.substring(0,1))) { //본인지뢰는 pass
-                            System.out.println(c.userName + " hit the bomb at (" + c.x + ", " + c.y + ")");
-                            c.hp--;
+                    int check = map.checkMine(c.x, c.y);
+                    if (check >= 0) {
+                        System.out.println(c.userName + " hit at (" + c.x + " , " + c.y + ")");
+                        map.updateMap(c.x, c.y);
+                        c.hp -= 1; // HP 감소
+                        sendtoall(c.userName + " HP: " + c.hp); // HP 전송
+                        if (c.hp <= 0) {
+                            c.alive = false; // 클라이언트 사망 처리
+                            sendtoall(c.userName + " has died.");
+                            System.out.println(c.userName + " has died.");
+                            sendtoall("Game Over");
+                            System.out.println("Game Over");
+                            return; // 게임 종료
                         }
-                        System.out.println(c.userName + "'s hp : " + c.hp);
-                    } else { //아무것도 못찾음
+                    } else {
                         System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
                     }
-                    map.updateMap(c.x,c.y);
+
                     c.send("" + check);
                     c.turn = true;
                 }
@@ -83,15 +84,18 @@ public class SubmarineServer {
     }
 
     public void sendtoall(String msg) {
-        for (Client c : clients)
+        for (Client c : clients) {
             c.send(msg);
+        }
     }
 
     public boolean allTurn() {
         int i = 0;
-        for (Client c : clients)
-            if (!c.turn)
+        for (Client c : clients) {
+            if (!c.turn) {
                 i++;
+            }
+        }
         return i == clients.size();
     }
 
@@ -102,7 +106,8 @@ public class SubmarineServer {
         String userName = null;
         String[][] mines = null;
         int x, y;
-        int hp = 3;
+        int hp = 3; // 기본 HP 설정
+        boolean alive = true; // 클라이언트 생존 여부
         public boolean turn = false;
 
         public Client(Socket socket) throws Exception {
@@ -118,7 +123,7 @@ public class SubmarineServer {
 
             userName = (String) objectInput.readObject();
             mines = (String[][]) objectInput.readObject(); // 2D 배열 수신
-            System.out.println(userName + " joins from  " + socket.getInetAddress());
+            System.out.println(userName + " joins from " + socket.getInetAddress());
             System.out.println("수신한 지뢰 배열: ");
             for (int i = 0; i < mines.length; i++) {
                 for (int j = 0; j < mines[i].length; j++) {
@@ -126,22 +131,50 @@ public class SubmarineServer {
                 }
                 System.out.println();
             }
-            send("Wait for other player..");
+            send("wait for other player..");
         }
 
         @Override
         public void run() {
             String msg;
-
             try {
                 while (true) {
                     msg = in.readLine();
-                    if (turn) {
-                        String[] arr = msg.split(",");
-                        x = Integer.parseInt(arr[0]);
-                        y = Integer.parseInt(arr[1]);
-                        send("ok");
-                        turn = false;
+                    if (msg.startsWith("MOVE:")) {
+                        String[] parts = msg.substring(5).split(",");
+                        x = Integer.parseInt(parts[0]);
+                        y = Integer.parseInt(parts[1]);
+
+                        int check = map.checkMine(x, y);
+                        String value;
+                        if (check == 99) {
+                            value = "99"; // 보물
+                            updateHP(userName, 1); // 보물 찾으면 HP 증가
+                        } else if (check == 98) {
+                            value = "98"; // 지뢰
+                            updateHP(userName, -1); // 지뢰 밟으면 HP 감소
+                        } else {
+                            value = String.valueOf(check);
+                        }
+                        map.updateMap(x, y);
+                        sendtoall("UPDATE:" + x + "," + y + "," + value);
+                    } else {
+                        if (turn && alive) {
+                            try {
+                                String[] arr = msg.split(",");
+                                if (arr.length == 2 && isNumeric(arr[0]) && isNumeric(arr[1])) {
+                                    x = Integer.parseInt(arr[0]);
+                                    y = Integer.parseInt(arr[1]);
+                                    send("ok");
+                                    turn = false;
+                                } else {
+                                    send("Invalid input. Please enter valid coordinates.");
+                                }
+                            } catch (NumberFormatException e) {
+                                System.out.println("Invalid input: " + msg);
+                                send("Invalid input. Please enter valid coordinates.");
+                            }
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -149,8 +182,28 @@ public class SubmarineServer {
             }
         }
 
+        private void updateHP(String userName, int delta) {
+            for (Client c : clients) {
+                if (c.userName.equals(userName)) {
+                    c.hp += delta;
+                    sendtoall(c.userName + " HP: " + c.hp);
+                    if (c.hp <= 0) {
+                        c.alive = false;
+                        sendtoall(c.userName + " has died.");
+                        sendtoall("Game Over");
+                        System.out.println("Game Over");
+                        break;
+                    }
+                }
+            }
+        }
+
         public void send(String msg) {
             out.println(msg);
+        }
+
+        private boolean isNumeric(String str) {
+            return str != null && str.matches("\\d+");
         }
     }
 }
