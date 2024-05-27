@@ -75,20 +75,32 @@ public class SubmarineServer {
         sendtoall("난이도 선택이 완료되었습니다. 선택된 난이도는 " + level + "입니다.");
         
         
+        
         // 2단계 진행
-
+        sendtoall("능력을 선택하십시오!");
+        
+        // 플레이어에게 능력 선택 창 띄움
+        
+        // 모든 플레이어가 선택 완료 시 메시지 전송
+        sendtoall("능력 선택이 완료되었습니다.");
+        
+        
+        
+        // 3단계 진행
+        sendtoall("지뢰를 매설하십시오!");
+        
+        
+        // 모든 플레이어가 매설 완료 시 메시지 전송
+        sendtoall("모든 지뢰가 매설되었습니다. 게임을 시작합니다.");
+        
+        // 4단계 진행
         while (true) {
             if (allTurn()) {
                 System.out.println();
-
+                
+                sendtoall("게임이 시작됩니다. 첫 번째 차례는 <플레이어 1>입니다.");
                 for (Client c : clients) {
                     int check = map.checkMine(c.x, c.y);
-//                    if (check >= 0) {
-//                        System.out.println(c.userName + " hit at (" + c.x + " , " + c.y + ")");
-//                        map.updateMap(c.x, c.y);
-//                    } else
-//                        System.out.println(c.userName + " miss at (" + c.x + " , " + c.y + ")");
-
                     if (check == 99) {  // 보물발견
                         System.out.println(c.userName + " find treasure at (" + c.x + ", " + c.y + ")");
                         if (c.hp < 3) c.hp++;
@@ -108,6 +120,22 @@ public class SubmarineServer {
                 }
             }
         }
+        
+        // 5단계 진행
+        // 게임 종료 시 모든 플레이어에게 결과 메시지 전송
+        sendtoall("게임 종료! 결과를 확인하십시오.");
+        
+        // 결과창 표시
+        
+        
+        // 플레이어 1에게 선택지 부여
+        clients.get(0).send("재시작 또는 종료를 선택하십시오.");
+        
+        // 플레이어 2에게 선택지 부여
+        clients.get(1).send("복수 또는 종료를 선택하십시오.");
+        
+        
+        
     }
 
     public void sendtoall(String msg) {
