@@ -19,7 +19,8 @@ public class SubmarineClient extends JFrame {
     private String[][] mines; // 지뢰 위치 배열
     private static final int num_mine = 3; // 지뢰 수
     private static final int width = 9; // 맵 너비
-    private Timer timer; // 선택 시간 타이머
+    private Timer timer; // 난이도 선택 시간 타이머
+    private Timer aTimer; // 능력 선택 시간 타이머
 
     public SubmarineClient() {
         // GUI 구성 요소 초기화
@@ -47,6 +48,9 @@ public class SubmarineClient extends JFrame {
         setSize(600, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setVisible(true);
+        
+        // 능력 선택
+        
 
         // 사용자 이름 및 지뢰 위치 입력 받기
         userName = JOptionPane.showInputDialog(this, "Enter your username:");
@@ -92,6 +96,9 @@ public class SubmarineClient extends JFrame {
                                 }
                                 if (message.contains("당신은 방장입니다")) {
                                     showDifficultySelection(); // 방장에게 난이도 선택 창 표시
+                                }
+                                if (message.contains("능력을 선택하십시오!")) {
+                                	showAbilitySelection();
                                 }
                             }
                         }
@@ -150,6 +157,61 @@ public class SubmarineClient extends JFrame {
         timer = new Timer(20000, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 out.println("DIFFICULTY:Beginner"); // 기본 난이도 전송
+                dialog.dispose(); // 대화 상자 닫기
+            }
+        });
+        timer.setRepeats(false); // 타이머 반복 설정 안함
+        timer.start(); // 타이머 시작
+
+        dialog.setVisible(true);
+    }
+    
+    public void showAbilitySelection() {
+        // 능력 선택 창 생성
+        JDialog dialog = new JDialog(this, "능력 선택", true);
+        dialog.setSize(300, 400);
+        dialog.setLayout(new BorderLayout());
+
+        // 난이도 선택 메시지 라벨
+        JLabel label = new JLabel("능력 카드를 선택해주세요", JLabel.CENTER);
+        dialog.add(label, BorderLayout.NORTH);
+
+        // 버튼 패널 생성 및 버튼 추가
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 3));
+        // 능력 풀에서 무작위로 가져와야 함. 수정 필요
+        JButton firstAbilityButton = new JButton("1"); 
+        JButton secondAbilityButton = new JButton("2");
+        JButton thirdAbilityButton = new JButton("3");
+        
+        // 버튼 리스너 설정
+        ActionListener abilityListener = new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String ability = ((JButton) e.getSource()).getText();
+                out.println("ABILITY:" + ability); // 선택한 능력을 서버로 전송
+                dialog.dispose(); // 선택 후 대화 상자 닫기
+                timer.stop(); // 타이머 중지
+            }
+        };
+        
+        firstAbilityButton.addActionListener(abilityListener);
+        secondAbilityButton.addActionListener(abilityListener);
+        thirdAbilityButton.addActionListener(abilityListener);
+        
+        buttonPanel.add(firstAbilityButton);
+        buttonPanel.add(secondAbilityButton);
+        buttonPanel.add(thirdAbilityButton);
+
+        dialog.add(buttonPanel, BorderLayout.CENTER);
+        
+        // 타이머 메시지 라벨
+        JLabel aTimerLabel = new JLabel("30초간 선택하지 않으면 무작위 능력이 선택됩니다", JLabel.CENTER);
+        dialog.add(aTimerLabel, BorderLayout.SOUTH);
+        
+        // 30초 후 기본 난이도로 설정
+        aTimer = new Timer(30000, new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+            	// 무작위 능력 전송하도록 변경해야 함.
+                out.println("ABILITY:1"); // 무작위 능력 전송
                 dialog.dispose(); // 대화 상자 닫기
             }
         });
