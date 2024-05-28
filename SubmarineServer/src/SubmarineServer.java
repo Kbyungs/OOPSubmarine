@@ -71,7 +71,6 @@ public class SubmarineServer {
                 if (selectedDifficulty.equals("Beginner")) {
                     clients.get(0).send("20초가 지났습니다. 기본 난이도 Beginner로 설정됩니다.");
                 }
-                sendtoall("난이도 선택이 완료되었습니다. 선택된 난이도는 " + selectedDifficulty + "입니다.");
             }
         }, 20000); // 20초 후 실행
 
