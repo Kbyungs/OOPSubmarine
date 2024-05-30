@@ -1,10 +1,11 @@
-package submarineclient;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
+import java.util.Random;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SubmarineClient extends JFrame {
     private JTextArea textArea; // 서버 메시지를 표시할 텍스트 영역
@@ -19,8 +20,10 @@ public class SubmarineClient extends JFrame {
     private String[][] mines; // 지뢰 위치 배열
     private static final int num_mine = 3; // 지뢰 수
     private static final int width = 9; // 맵 너비
-    private Timer timer; // 난이도 선택 시간 타이머
+    private Timer timer; // 선택 시간 타이머
     private Timer aTimer; // 능력 선택 시간 타이머
+    
+    private boolean myTurn = false;
 
     public SubmarineClient() {
         // GUI 구성 요소 초기화
@@ -88,6 +91,12 @@ public class SubmarineClient extends JFrame {
                         while ((message = in.readLine()) != null) { // 서버로부터 메시지를 수신
                             if (message.startsWith("UPDATE:")) { // 업데이트 메시지 처리
                                 handleUpdate(message.substring(7));
+                            } else if (message.equals("your turn")) {
+                                myTurn = true;
+                                enableAllButtons();
+                            } else if (message.equals("not your turn")) {
+                                myTurn = false;
+                                disableAllButtons();
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 if (message.equals("Game Over") || message.contains("has died")) {
@@ -96,13 +105,13 @@ public class SubmarineClient extends JFrame {
                                 }
                                 if (message.contains("당신은 방장입니다")) {
                                     showDifficultySelection(); // 방장에게 난이도 선택 창 표시
-                                }
-                                if (message.contains("능력을 선택하십시오!")) {
-                                	showAbilitySelection();
+                                } else if (message.contains("능력을 선택해주세요")) { // 능력 선택 메시지 수신 시
+                                    showAbilitySelection(); // 능력 선택 창 표시
                                 }
                             }
                         }
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
@@ -166,59 +175,71 @@ public class SubmarineClient extends JFrame {
         dialog.setVisible(true);
     }
     
+    // 능력 선택창을 표시하는 메서드
     public void showAbilitySelection() {
         // 능력 선택 창 생성
         JDialog dialog = new JDialog(this, "능력 선택", true);
         dialog.setSize(300, 400);
         dialog.setLayout(new BorderLayout());
 
-        // 난이도 선택 메시지 라벨
+        // 능력 선택 메시지 라벨
         JLabel label = new JLabel("능력 카드를 선택해주세요", JLabel.CENTER);
         dialog.add(label, BorderLayout.NORTH);
 
+        // 서버에서 받은 능력 목록 가져오기
+        Map<String, String> abilities = getAbilitiesFromServer();
+        
         // 버튼 패널 생성 및 버튼 추가
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 3));
-        // 능력 풀에서 무작위로 가져와야 함. 수정 필요
-        JButton firstAbilityButton = new JButton("1"); 
-        JButton secondAbilityButton = new JButton("2");
-        JButton thirdAbilityButton = new JButton("3");
-        
-        // 버튼 리스너 설정
-        ActionListener abilityListener = new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                String ability = ((JButton) e.getSource()).getText();
-                out.println("ABILITY:" + ability); // 선택한 능력을 서버로 전송
-                dialog.dispose(); // 선택 후 대화 상자 닫기
-                timer.stop(); // 타이머 중지
-            }
-        };
-        
-        firstAbilityButton.addActionListener(abilityListener);
-        secondAbilityButton.addActionListener(abilityListener);
-        thirdAbilityButton.addActionListener(abilityListener);
-        
-        buttonPanel.add(firstAbilityButton);
-        buttonPanel.add(secondAbilityButton);
-        buttonPanel.add(thirdAbilityButton);
+        JPanel buttonPanel = new JPanel(new GridLayout(0, 2)); // 2열의 그리드 레이아웃
+
+        for (String abilityKey : abilities.keySet()) {
+            JButton abilityButton = new JButton(abilities.get(abilityKey));
+            abilityButton.setActionCommand(abilityKey); // 버튼의 액션 커맨드로 능력 키 설정
+            abilityButton.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    String ability = e.getActionCommand();
+                    out.println("ABILITY:" + ability); // 선택한 능력을 서버로 전송
+                    dialog.dispose(); // 선택 후 대화 상자 닫기
+                    aTimer.stop(); // 타이머 중지
+                }
+            });
+            buttonPanel.add(abilityButton);
+        }
 
         dialog.add(buttonPanel, BorderLayout.CENTER);
         
         // 타이머 메시지 라벨
-        JLabel aTimerLabel = new JLabel("30초간 선택하지 않으면 무작위 능력이 선택됩니다", JLabel.CENTER);
+        JLabel aTimerLabel = new JLabel("30초간 선택하지 않으면 무작위 능력이 부여됩니다", JLabel.CENTER);
         dialog.add(aTimerLabel, BorderLayout.SOUTH);
         
-        // 30초 후 기본 난이도로 설정
+        // 30초 후 무작위 능력으로 설정
         aTimer = new Timer(30000, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-            	// 무작위 능력 전송하도록 변경해야 함.
-                out.println("ABILITY:1"); // 무작위 능력 전송
+                Random random = new Random();
+                int randomAbility = random.nextInt(abilities.size()) + 1;
+                out.println("ABILITY:" + randomAbility); // 무작위 능력 전송
                 dialog.dispose(); // 대화 상자 닫기
             }
         });
-        timer.setRepeats(false); // 타이머 반복 설정 안함
-        timer.start(); // 타이머 시작
+        aTimer.setRepeats(false); // 타이머 반복 설정 안함
+        aTimer.start(); // 타이머 시작
 
         dialog.setVisible(true);
+    }
+
+    // 서버에서 능력 목록을 가져오는 메서드 (모의 메서드)
+    private Map<String, String> getAbilitiesFromServer() {
+        // 서버로부터 능력 목록을 받아오는 로직 필요 (현재는 하드코딩된 값 사용)
+        Map<String, String> abilities = new HashMap<>();
+        abilities.put("1", "빙결");
+        abilities.put("2", "탐색");
+        abilities.put("3", "소생");
+        abilities.put("4", "탐험가");
+        abilities.put("5", "거인");
+        abilities.put("6", "방어막");
+        abilities.put("7", "지뢰 수집가");
+        abilities.put("8", "발화");
+        return abilities;
     }
 
     // 서버로부터의 업데이트 메시지를 처리하는 메서드
@@ -233,7 +254,7 @@ public class SubmarineClient extends JFrame {
 
     // 서버로 좌표를 전송하는 메서드
     private void sendCoordinates(int x, int y) {
-        out.println("MOVE:" + x + "," + y);
+        if (myTurn) out.println("MOVE:" + x + "," + y);
     }
 
     // 모든 버튼을 비활성화하는 메서드
@@ -241,6 +262,14 @@ public class SubmarineClient extends JFrame {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < width; j++) {
                 buttons[i][j].setEnabled(false);
+            }
+        }
+    }
+
+    private void enableAllButtons() {
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j].setEnabled(true);
             }
         }
     }
@@ -263,3 +292,4 @@ public class SubmarineClient extends JFrame {
         new SubmarineClient(); // 클라이언트 실행
     }
 }
+
