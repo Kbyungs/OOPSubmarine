@@ -158,7 +158,7 @@ public class SubmarineServer {
             playerAbilities.put(client, new ArrayList<>());
         }
         playerAbilities.get(client).add(ability);
-        System.out.println(client.userName + " chose ability: " + abilities.get(ability));
+        System.out.println(client.userName + " chose ability: " + ability);
     }
 
     // 모든 플레이어가 능력을 선택했는지 확인하는 메서드
