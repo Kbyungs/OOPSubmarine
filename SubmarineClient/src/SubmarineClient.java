@@ -186,8 +186,8 @@ public class SubmarineClient extends JFrame {
         JLabel label = new JLabel("능력 카드를 선택해주세요", JLabel.CENTER);
         dialog.add(label, BorderLayout.NORTH);
 
-        // 서버에서 받은 능력 목록 가져오기
-        Map<String, String> abilities = getAbilitiesFromServer();
+        // 능력 목록 가져오기
+        Map<String, String> abilities = getAbilities();
         
         // 버튼 패널 생성 및 버튼 추가
         JPanel buttonPanel = new JPanel(new GridLayout(0, 2)); // 2열의 그리드 레이아웃
@@ -227,9 +227,8 @@ public class SubmarineClient extends JFrame {
         dialog.setVisible(true);
     }
 
-    // 서버에서 능력 목록을 가져오는 메서드 (모의 메서드)
-    private Map<String, String> getAbilitiesFromServer() {
-        // 서버로부터 능력 목록을 받아오는 로직 필요 (현재는 하드코딩된 값 사용)
+    // 능력 목록을 반환하는 메서드 
+    private Map<String, String> getAbilities() {
         Map<String, String> abilities = new HashMap<>();
         abilities.put("1", "빙결");
         abilities.put("2", "탐색");
