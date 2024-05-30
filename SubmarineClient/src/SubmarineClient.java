@@ -9,11 +9,13 @@ import java.util.Map;
 
 public class SubmarineClient extends JFrame {
     private JTextArea textArea; // 서버 메시지를 표시할 텍스트 영역
+    private JButton abilityUseButton; // 능력 사용 버튼
     private JButton[][] buttons; // 게임 버튼 배열
     private Socket socket; // 서버와의 소켓 연결
     private PrintWriter out; // 서버로의 출력 스트림
     private BufferedReader in; // 서버로부터의 입력 스트림
     private ObjectOutputStream objectOut; // 객체 전송용 출력 스트림
+    private Map map;
 
     private String userName; // 사용자 이름
     private String ip; // 서버 IP 주소
@@ -22,6 +24,8 @@ public class SubmarineClient extends JFrame {
     private static final int width = 9; // 맵 너비
     private Timer timer; // 선택 시간 타이머
     private Timer aTimer; // 능력 선택 시간 타이머
+    private int abilityUseCount = 1;
+    private String abilitySave;
     
     private boolean myTurn = false;
 
@@ -30,7 +34,23 @@ public class SubmarineClient extends JFrame {
         textArea = new JTextArea();
         textArea.setEditable(false); // 텍스트 영역은 수정 불가
         buttons = new JButton[width][width];
+        abilityUseButton = new JButton("능력 발동");
+        abilityUseButton.setPreferredSize(new Dimension(100, 600));
+        
+        abilityUseButton.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+                if (abilityUseCount != 0) {
+                	abilityUseCount--;
+                    System.out.println("능력 발동!");
+                    performAbility();
+                    out.println("USE_ABILITY:" + userName); // 서버로 능력 사용 메시지 전송
+                } else {
+                    System.out.println("능력을 모두 사용했습니다.");
+                }
+            }
+        });	
 
+        
         // 그리드 레이아웃 설정
         JPanel gridPanel = new JPanel(new GridLayout(width, width));
         for (int i = 0; i < width; i++) {
@@ -45,6 +65,7 @@ public class SubmarineClient extends JFrame {
         setLayout(new BorderLayout());
         add(new JScrollPane(textArea), BorderLayout.CENTER); // 텍스트 영역을 중앙에 추가
         add(gridPanel, BorderLayout.SOUTH); // 그리드 패널을 남쪽에 추가
+        add(abilityUseButton, BorderLayout.EAST); // 채팅창 옆에 능력 사용 버튼 추가
 
         // 창 설정
         setTitle("MZ뢰찾기");
@@ -70,6 +91,7 @@ public class SubmarineClient extends JFrame {
         connectToServer();
     }
 
+    
     // 서버와의 연결 설정 메서드
     private void connectToServer() {
         try {
@@ -199,6 +221,8 @@ public class SubmarineClient extends JFrame {
                 public void actionPerformed(ActionEvent e) {
                     String ability = e.getActionCommand();
                     out.println("ABILITY:" + ability); // 선택한 능력을 서버로 전송
+                    abilitySave = ability;
+                    System.out.println(abilitySave);
                     dialog.dispose(); // 선택 후 대화 상자 닫기
                     aTimer.stop(); // 타이머 중지
                 }
@@ -216,7 +240,7 @@ public class SubmarineClient extends JFrame {
         aTimer = new Timer(30000, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 Random random = new Random();
-                int randomAbility = random.nextInt(abilities.size()) + 1;
+                int randomAbility = random.nextInt(4);
                 out.println("ABILITY:" + randomAbility); // 무작위 능력 전송
                 dialog.dispose(); // 대화 상자 닫기
             }
@@ -230,16 +254,56 @@ public class SubmarineClient extends JFrame {
     // 능력 목록을 반환하는 메서드 
     private Map<String, String> getAbilities() {
         Map<String, String> abilities = new HashMap<>();
-        abilities.put("1", "빙결");
-        abilities.put("2", "탐색");
-        abilities.put("3", "소생");
-        abilities.put("4", "탐험가");
-        abilities.put("5", "거인");
-        abilities.put("6", "방어막");
-        abilities.put("7", "지뢰 수집가");
-        abilities.put("8", "발화");
+        abilities.put("1", "탐색");
+        abilities.put("2", "발화");
+        abilities.put("3", "거인");
+        abilities.put("4", "폭발");
         return abilities;
     }
+    
+    public void performAbility() {
+        switch (abilitySave) {
+            case "1":
+            	showExploreGUI();
+                break;
+            case "2":
+                break;
+            case "3":
+                break;
+            case "4":
+                break;
+            default:
+                System.out.println(userName + " 님은 능력이 없습니다.");
+                break;
+        }
+    }
+    
+    public void showExploreGUI() {
+    	String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
+        String[] temp = input.split(",");
+        int x = Integer.parseInt(temp[0].trim());
+        int y = Integer.parseInt(temp[1].trim());
+        explore(x, y);
+        temp[0] = null;
+        temp[1] = null;
+    }
+    
+    public void explore(int x, int y) {
+    	boolean f = false;
+    	for (int i = 0; i < num_mine; i++) {
+    		if (Integer.parseInt(mines[i][0]) == x && Integer.parseInt(mines[i][1]) == y) {
+    			f = true;
+    		}
+        }
+    	
+    	if (f) { 
+            textArea.append("해당 위치는 지뢰가 있습니다\n");
+            buttons[x][y].setBackground(Color.RED);
+        } else {
+            textArea.append("해당 위치는 지뢰가 없습니다\n");
+        }    
+    }
+    
 
     // 서버로부터의 업데이트 메시지를 처리하는 메서드
     private void handleUpdate(String update) {
@@ -291,4 +355,3 @@ public class SubmarineClient extends JFrame {
         new SubmarineClient(); // 클라이언트 실행
     }
 }
-
