@@ -72,10 +72,7 @@ public class SubmarineServer {
             }
         }, 20000); // 20초 후 실행
 
-        // 능력 선택
-        initializeAbilities(); // 능력 초기화
-        
-        // 추가: 능력 선택 메시지 전송
+        // 능력 선택 메시지 전송
         for (Client c : clients) {
             c.send("능력을 선택해주세요.");
         }
@@ -155,19 +152,7 @@ public class SubmarineServer {
         }
     }
 
-    // 능력 풀 초기화 메서드
-    public void initializeAbilities() {
-        abilities.put("1", "빙결");
-        abilities.put("2", "탐색");
-        abilities.put("3", "소생");
-        abilities.put("4", "탐험가");
-        abilities.put("5", "거인");
-        abilities.put("6", "방어막");
-        abilities.put("7", "지뢰 수집가");
-        abilities.put("8", "발화");
-    }
-
-    // 추가: 클라이언트의 능력을 저장하는 메서드
+    // 클라이언트의 능력을 저장하는 메서드
     public void savePlayerAbility(Client client, String ability) {
         if (!playerAbilities.containsKey(client)) {
             playerAbilities.put(client, new ArrayList<>());
@@ -176,7 +161,7 @@ public class SubmarineServer {
         System.out.println(client.userName + " chose ability: " + abilities.get(ability));
     }
 
-    // 추가: 모든 플레이어가 능력을 선택했는지 확인하는 메서드
+    // 모든 플레이어가 능력을 선택했는지 확인하는 메서드
     public boolean allPlayersChoseAbility() {
         for (Client client : clients) {
             if (!playerAbilities.containsKey(client) || playerAbilities.get(client).isEmpty()) {
