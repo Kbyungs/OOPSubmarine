@@ -1,5 +1,3 @@
-package submarineserver;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -76,6 +74,7 @@ public class Map {
 
     // 지뢰 배치 메서드
     public void deployMine(int x, int y, String s) {
+        displayMap[x][y] = "s";
         mineMap[x][y] = s;
     }
 
