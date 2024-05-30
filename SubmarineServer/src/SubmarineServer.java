@@ -1,5 +1,3 @@
-package submarineserver;
-
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -15,12 +13,12 @@ import java.util.HashMap;
 import java.util.Random;
 import java.util.Scanner;
 
-
 public class SubmarineServer {
     public static int inPort = 9999; // 서버가 수신할 포트 번호
     public static Vector<Client> clients = new Vector<Client>(); // 연결된 클라이언트 목록
     public static int maxPlayer = 2; // 최대 플레이어 수
     public static int numPlayer = 0; // 현재 접속한 플레이어 수
+    private int currentPlayerIndex = 0; // 현재 플레이어 인덱스를 저장
     public static int width = 10; // 맵의 너비
     public static int num_trs = 10; // 맵에 배치될 보물의 수
     public static int num_mine = 3; // 각 플레이어가 배치할 지뢰의 수
@@ -76,8 +74,11 @@ public class SubmarineServer {
 
         // 능력 선택
         initializeAbilities(); // 능력 초기화
-        sendtoall("choose your ability!"); // 능력 선택 요청 메시지 전송
-        sendtoall("능력 선택이 완료되었습니다."); // 능력 선택 완료 메시지 전송
+        
+        // 추가: 능력 선택 메시지 전송
+        for (Client c : clients) {
+            c.send("능력을 선택해주세요.");
+        }
 
         map = new Map(width, num_trs); // 맵 객체 생성
 
@@ -94,6 +95,8 @@ public class SubmarineServer {
         map.printMap(map.mineMap); // 맵 출력
 
         sendtoall("Start Game"); // 모든 클라이언트에게 게임 시작 메시지 전송
+        clients.get(currentPlayerIndex).turn = true;
+        sendTurnMessage();
 
         // 게임 진행 루프
         while (true) {
@@ -143,6 +146,15 @@ public class SubmarineServer {
         sendtoall("난이도 선택이 완료되었습니다. 선택된 난이도는 " + selectedDifficulty + "입니다.");
     }
 
+    public void sendTurnMessage() {
+        Client currentPlayer = clients.get(currentPlayerIndex);
+        sendtoall("[관리자] : "+ currentPlayer.userName + "의 차례입니다.");
+        currentPlayer.send("your turn");
+        for (Client c : clients) {
+            if (!c.userName.equals(currentPlayer.userName)) c.send("not your turn");
+        }
+    }
+
     // 능력 풀 초기화 메서드
     public void initializeAbilities() {
         abilities.put("1", "빙결");
@@ -153,6 +165,25 @@ public class SubmarineServer {
         abilities.put("6", "방어막");
         abilities.put("7", "지뢰 수집가");
         abilities.put("8", "발화");
+    }
+
+    // 추가: 클라이언트의 능력을 저장하는 메서드
+    public void savePlayerAbility(Client client, String ability) {
+        if (!playerAbilities.containsKey(client)) {
+            playerAbilities.put(client, new ArrayList<>());
+        }
+        playerAbilities.get(client).add(ability);
+        System.out.println(client.userName + " chose ability: " + abilities.get(ability));
+    }
+
+    // 추가: 모든 플레이어가 능력을 선택했는지 확인하는 메서드
+    public boolean allPlayersChoseAbility() {
+        for (Client client : clients) {
+            if (!playerAbilities.containsKey(client) || playerAbilities.get(client).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // 모든 클라이언트가 턴을 마쳤는지 확인하는 메서드
@@ -226,10 +257,18 @@ public class SubmarineServer {
                             value = String.valueOf(check);
                         }
                         map.updateMap(x, y); // 맵 업데이트
+                        currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
+                        sendTurnMessage();
                         sendtoall("UPDATE:" + x + "," + y + "," + value); // 업데이트 정보 전송
                     } else if (msg.startsWith("DIFFICULTY:")) { // 난이도 선택 메시지 처리
                         String difficulty = msg.substring(11); // 선택한 난이도를 추출
                         setDifficulty(difficulty); // 난이도 설정
+                    } else if (msg.startsWith("ABILITY:")) { // 능력 선택 메시지 처리
+                        String ability = msg.substring(8); // 선택한 능력 추출
+                        savePlayerAbility(this, ability); // 클라이언트의 능력 저장
+                        if (allPlayersChoseAbility()) { // 모든 플레이어가 능력을 선택했는지 확인
+                            sendtoall("능력 선택이 완료되었습니다."); // 능력 선택 완료 메시지 전송
+                        }
                     } else {
                         if (turn && alive) { // 턴과 생존 여부 확인
                             try {
