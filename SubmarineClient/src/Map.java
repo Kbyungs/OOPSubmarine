@@ -1,5 +1,3 @@
-package submarineclient;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +26,7 @@ public class Map {
         printMap(mineMap); // 맵 출력
     }
 
-    // 특정 위치에 지뢰가 있는지 확인하는 메서드
+    // 특정 위치에 보물이 있는지 확인하는 메서드
     public int checkMine(int x, int y) {
         int pos = (x * width) + y;
 
@@ -40,7 +38,7 @@ public class Map {
             return -1;
         }
     }
-
+    
     // 맵을 출력하는 메서드
     public void printMap(String [][] a) {
         System.out.println();
