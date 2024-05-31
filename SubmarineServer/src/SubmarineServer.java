@@ -254,6 +254,14 @@ public class SubmarineServer {
                         if (allPlayersChoseAbility()) { // 모든 플레이어가 능력을 선택했는지 확인
                             sendtoall("능력 선택이 완료되었습니다."); // 능력 선택 완료 메시지 전송
                         }
+                    } else if (msg.startsWith("HEALING:")) {
+                    	updateHP(userName, 1);
+                    } else if (msg.startsWith("STEAL")) {
+                    	if (turn == true) {
+                    		turn = false;
+                            currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
+                            sendTurnMessage();
+                    	} 
                     } else {
                         if (turn && alive) { // 턴과 생존 여부 확인
                             try {
