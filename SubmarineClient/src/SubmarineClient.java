@@ -41,11 +41,11 @@ public class SubmarineClient extends JFrame {
         	public void actionPerformed(ActionEvent e) {
                 if (abilityUseCount != 0) {
                 	abilityUseCount--;
-                    System.out.println("능력 발동!");
+                	textArea.append("능력 발동!\n");
                     performAbility();
                     out.println("USE_ABILITY:" + userName); // 서버로 능력 사용 메시지 전송
                 } else {
-                    System.out.println("능력을 모두 사용했습니다.");
+                	textArea.append("능력을 모두 사용했습니다.\n");
                 }
             }
         });	
@@ -73,9 +73,6 @@ public class SubmarineClient extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setVisible(true);
         
-        // 능력 선택
-        
-
         // 사용자 이름 및 지뢰 위치 입력 받기
         userName = JOptionPane.showInputDialog(this, "Enter your username:");
         ip = JOptionPane.showInputDialog(this, "Enter IP:");
@@ -129,7 +126,7 @@ public class SubmarineClient extends JFrame {
                                     showDifficultySelection(); // 방장에게 난이도 선택 창 표시
                                 } else if (message.contains("능력을 선택해주세요")) { // 능력 선택 메시지 수신 시
                                     showAbilitySelection(); // 능력 선택 창 표시
-                                }
+                                } 
                             }
                         }
                     }
@@ -256,8 +253,8 @@ public class SubmarineClient extends JFrame {
         Map<String, String> abilities = new HashMap<>();
         abilities.put("1", "탐색");
         abilities.put("2", "발화");
-        abilities.put("3", "거인");
-        abilities.put("4", "폭발");
+        abilities.put("3", "회복");
+        abilities.put("4", "강탈");
         return abilities;
     }
     
@@ -267,10 +264,13 @@ public class SubmarineClient extends JFrame {
             	showExploreGUI();
                 break;
             case "2":
+            	showIgniteGUI();
                 break;
             case "3":
+            	healing();
                 break;
             case "4":
+            	steal();
                 break;
             default:
                 System.out.println(userName + " 님은 능력이 없습니다.");
@@ -278,6 +278,7 @@ public class SubmarineClient extends JFrame {
         }
     }
     
+    // 탐색 능력 입력창 띄우기
     public void showExploreGUI() {
     	String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
         String[] temp = input.split(",");
@@ -288,6 +289,7 @@ public class SubmarineClient extends JFrame {
         temp[1] = null;
     }
     
+    // 탐색 능력 구현
     public void explore(int x, int y) {
     	boolean f = false;
     	for (int i = 0; i < num_mine; i++) {
@@ -302,6 +304,33 @@ public class SubmarineClient extends JFrame {
         } else {
             textArea.append("해당 위치는 지뢰가 없습니다\n");
         }    
+    }
+    
+    // 발화 능력 입력창 띄우기
+    public void showIgniteGUI() {
+    	String input = JOptionPane.showInputDialog(this, "불태우기를 원하는 좌표를 입력하세요" + ":");
+        String[] temp = input.split(",");
+        int x = Integer.parseInt(temp[0].trim());
+        int y = Integer.parseInt(temp[1].trim());
+        ingite(x, y);
+        temp[0] = null;
+        temp[1] = null;
+    }
+    
+    public void ingite(int x, int y) {
+    	buttons[x][y].setBackground(Color.BLACK);
+    	buttons[x][y].setEnabled(false);  
+    }
+    
+    // 회복 능력 구현
+    public void healing() {
+    	out.println("HEALING:" + "1");
+    	textArea.append("체력을 1 회복했습니다!\n");
+    }
+    
+    public void steal() {
+    	out.println("STEAL");
+    	textArea.append("상대방의 턴을 뺐어왓습니다!\n");
     }
     
 
