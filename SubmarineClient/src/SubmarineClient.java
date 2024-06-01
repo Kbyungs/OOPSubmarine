@@ -16,7 +16,7 @@ public class SubmarineClient extends JFrame {
     private PrintWriter out; // 서버로의 출력 스트림
     private BufferedReader in; // 서버로부터의 입력 스트림
     private ObjectOutputStream objectOut; // 객체 전송용 출력 스트림
-    private Map map;
+    private ObjectInputStream objectIn; // 객체 수신용 입력 스트림
 
     private String userName; // 사용자 이름
     private String ip; // 서버 IP 주소
@@ -72,13 +72,24 @@ public class SubmarineClient extends JFrame {
     // 서버와의 연결 설정 메서드
     private void connectToServer() {
         try {
+            System.out.println("Attempting to connect to the server at " + ip + ":" + 9999);
             socket = new Socket(ip, 9999); // 서버 소켓에 연결
-            out = new PrintWriter(socket.getOutputStream(), true); // 출력 스트림 설정
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // 입력 스트림 설정
+            System.out.println("Connected to the server.");
             objectOut = new ObjectOutputStream(socket.getOutputStream()); // 객체 출력 스트림 설정
+            objectOut.flush(); // flush() 추가
+            System.out.println("ObjectOutputStream created");
+
+            out = new PrintWriter(socket.getOutputStream(), true); // 출력 스트림 설정
+            System.out.println("PrintWriter created");
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // 입력 스트림 설정
+            System.out.println("BufferedReader created");
+            objectIn = new ObjectInputStream(socket.getInputStream()); // 객체 입력 스트림 설정
+            System.out.println("ObjectInputStream created");
 
             // 사용자 이름 서버로 전송
             objectOut.writeObject(userName);
+            objectOut.flush(); // flush() 추가
+            System.out.println("Username sent to server");
 
             // 서버로부터의 메시지를 수신하는 스레드 시작
             new Thread(new Runnable() {
@@ -86,6 +97,7 @@ public class SubmarineClient extends JFrame {
                     try {
                         String message;
                         while ((message = in.readLine()) != null) { // 서버로부터 메시지 수신
+                            System.out.println("Received from server: " + message); // 디버그 메시지 추가
                             if (message.startsWith("UPDATE:")) { // 업데이트 메시지 처리
                                 handleUpdate(message.substring(7));
                             } else if (message.equals("your turn")) {
@@ -116,11 +128,13 @@ public class SubmarineClient extends JFrame {
                             }
                         }
                     } catch (IOException e) {
+                        System.err.println("Error during server communication: " + e.getMessage());
                         e.printStackTrace();
                     }
                 }
             }).start();
         } catch (IOException e) {
+            System.err.println("Failed to connect to the server: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -154,9 +168,11 @@ public class SubmarineClient extends JFrame {
                 mines[i][j] = temp[j];
         }
         try {
+            out.println("MINES:SET");
             objectOut.writeObject(mines); // 지뢰 위치 서버로 전송
-            objectOut.flush();
+            objectOut.flush(); // flush() 추가
         } catch (IOException e) {
+            System.err.println("Error during mine setting: " + e.getMessage());
             e.printStackTrace();
         }
     }
