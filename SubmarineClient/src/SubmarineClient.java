@@ -317,6 +317,7 @@ public class SubmarineClient extends JFrame {
         }
     }
 
+    // 탐색 능력 입력창 띄우기
     public void showExploreGUI() {
         String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
         String[] temp = input.split(",");
@@ -327,6 +328,7 @@ public class SubmarineClient extends JFrame {
         temp[1] = null;
     }
 
+    // 탐색 능력 구현
     public void explore(int x, int y) {
         boolean f = false;
         for (int i = 0; i < num_mine; i++) {
@@ -341,6 +343,33 @@ public class SubmarineClient extends JFrame {
         } else {
             textArea.append("해당 위치는 지뢰가 없습니다\n");
         }
+    }
+
+    // 발화 능력 입력창 띄우기
+    public void showIgniteGUI() {
+        String input = JOptionPane.showInputDialog(this, "불태우기를 원하는 좌표를 입력하세요" + ":");
+        String[] temp = input.split(",");
+        int x = Integer.parseInt(temp[0].trim());
+        int y = Integer.parseInt(temp[1].trim());
+        ingite(x, y);
+        temp[0] = null;
+        temp[1] = null;
+    }
+
+    public void ingite(int x, int y) {
+        buttons[x][y].setBackground(Color.BLACK);
+        buttons[x][y].setEnabled(false);
+    }
+
+    // 회복 능력 구현
+    public void healing() {
+        out.println("HEALING:" + "1");
+        textArea.append("체력을 1 회복했습니다!\n");
+    }
+
+    public void steal() {
+        out.println("STEAL");
+        textArea.append("상대방의 턴을 뺐어왓습니다!\n");
     }
 
     // 서버로부터의 업데이트 메시지를 처리하는 메서드
