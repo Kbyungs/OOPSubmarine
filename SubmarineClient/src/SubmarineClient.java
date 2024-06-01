@@ -47,6 +47,7 @@ public class SubmarineClient extends JFrame {
                     abilityUseCount--;
                     System.out.println("능력 발동!");
                     performAbility();
+                    abilityUseButton.setEnabled(false);
                     out.println("USE_ABILITY:" + userName); // 서버로 능력 사용 메시지 전송
                 } else {
                     System.out.println("능력을 모두 사용했습니다.");
@@ -306,10 +307,13 @@ public class SubmarineClient extends JFrame {
                 showExploreGUI();
                 break;
             case "2":
+                showIgniteGUI();
                 break;
             case "3":
+                healing();
                 break;
             case "4":
+                steal();
                 break;
             default:
                 System.out.println(userName + " 님은 능력이 없습니다.");
