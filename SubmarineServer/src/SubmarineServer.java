@@ -362,7 +362,7 @@ public class SubmarineServer {
                                 this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
                             }
                         } else {
-                            send("Invalid input. Please enter valid coordinates.");
+//                            send("Invalid input. Please enter valid coordinates.");
                         }
                     } else if (msg.startsWith("DIFFICULTY:")) {
                         String difficulty = msg.substring(11);
@@ -387,6 +387,14 @@ public class SubmarineServer {
                                 SubmarineServer.this.notifyAll();
                             }
                         }
+                    } else if (msg.startsWith("HEALING:")) {
+                        updateHP(userName, 1);
+                    } else if (msg.startsWith("STEAL:")) {
+                        if (turn == true) {
+                            turn = false;
+                            currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
+                            sendTurnMessage();
+                        }
                     } else {
                         if (turn && alive) {
                             try {
@@ -400,11 +408,11 @@ public class SubmarineServer {
                                         this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
                                     }
                                 } else {
-                                    send("Invalid input. Please enter valid coordinates.");
+//                                    send("Invalid input. Please enter valid coordinates.");
                                 }
                             } catch (NumberFormatException e) {
                                 System.out.println("Invalid input: " + msg);
-                                send("Invalid input. Please enter valid coordinates.");
+//                                send("Invalid input. Please enter valid coordinates.");
                             }
                         }
                     }
@@ -412,6 +420,23 @@ public class SubmarineServer {
             } catch (IOException | ClassNotFoundException e) {
                 System.err.println("Error during client communication: " + e.getMessage());
                 e.printStackTrace();
+            }
+        }
+
+        // 플레이어의 HP를 업데이트하는 메서드
+        private void updateHP(String userName, int delta) {
+            for (Client c : clients) {
+                if (c.userName.equals(userName)) {
+                    c.hp += delta;
+                    sendtoall(c.userName + " HP: " + c.hp); // HP 정보 전송
+                    if (c.hp <= 0) { // 플레이어가 사망했는지 확인
+                        c.alive = false;
+                        sendtoall(c.userName + " has died."); // 사망 정보 전송
+                        sendtoall("Game Over"); // 게임 종료 정보 전송
+                        System.out.println("Game Over");
+                        break;
+                    }
+                }
             }
         }
 
