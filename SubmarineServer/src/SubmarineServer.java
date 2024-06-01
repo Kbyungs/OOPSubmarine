@@ -137,24 +137,53 @@ public class SubmarineServer {
                 int y = currentPlayer.y;
 
                 int check = map.checkMine(x, y); // 지뢰 체크
-                if (check >= 0) {
-                    System.out.println(currentPlayer.userName + " hit at (" + x + " , " + y + ")");
-                    map.updateMap(x, y); // 맵 업데이트
-                    currentPlayer.hp -= 1; // 플레이어 HP 감소
-                    sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
-                    if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
-                        currentPlayer.alive = false; // 사망 처리
-                        sendtoall(currentPlayer.userName + " has died.");
-                        System.out.println(currentPlayer.userName + " has died.");
-                        sendtoall("Game Over");
-                        System.out.println("Game Over");
-                        return; // 게임 종료
+
+                map.printMap(map.mineMap);
+
+//                if (check >= 0) {
+//                    System.out.println(currentPlayer.userName + " hit at (" + x + " , " + y + ")");
+//                    map.updateMap(x, y); // 맵 업데이트
+//                    currentPlayer.hp -= 1; // 플레이어 HP 감소
+//                    sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
+//                    if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
+//                        currentPlayer.alive = false; // 사망 처리
+//                        sendtoall(currentPlayer.userName + " has died.");
+//                        System.out.println(currentPlayer.userName + " has died.");
+//                        sendtoall("Game Over");
+//                        System.out.println("Game Over");
+//                        return; // 게임 종료
+//                    }
+//                } else {
+//                    System.out.println(currentPlayer.userName + " miss at (" + x + " , " + y + ")");
+//                }
+
+                if (check == 99) {
+                    sendtoall(currentPlayer.userName + "보물발견!");
+//                    System.out.println(currentPlayer.userName + "보물발견!");
+                    if (currentPlayer.hp >= 3) {
+                        sendtoall(currentPlayer.userName + "의 체력이 최대입니다");
+                    } else {
+                        currentPlayer.hp += 1;
                     }
-                } else {
-                    System.out.println(currentPlayer.userName + " miss at (" + x + " , " + y + ")");
+                } else if (check == 98) {
+                    if (!map.mineMap[x][y].equals(currentPlayer.userName.substring(0,1))) {
+                        sendtoall(currentPlayer.userName + "는 상대방이 숨겨둔 지뢰를 밟았습니다");
+                        currentPlayer.hp -= 1;
+                    } else {
+                        sendtoall(currentPlayer.userName + "는 본인이 숨긴 지뢰를 밟았습니다");
+                    }
+                }
+                sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
+                if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
+                    currentPlayer.alive = false; // 사망 처리
+                    sendtoall(currentPlayer.userName + " has died.");
+                    System.out.println(currentPlayer.userName + " has died.");
+                    sendtoall("Game Over");
+                    System.out.println("Game Over");
+                    return; // 게임 종료
                 }
 
-                currentPlayer.send("" + check); // 클라이언트에게 결과 전송
+//                currentPlayer.send("" + check); // 클라이언트에게 결과 전송
                 sendUpdateToAllClients(x, y, check); // 모든 클라이언트에게 업데이트된 좌표와 값을 전송
 
                 currentPlayer.turn = false; // 현재 플레이어의 턴 종료
