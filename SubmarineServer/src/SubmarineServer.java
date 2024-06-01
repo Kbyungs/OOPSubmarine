@@ -155,6 +155,8 @@ public class SubmarineServer {
                 }
 
                 currentPlayer.send("" + check); // 클라이언트에게 결과 전송
+                sendUpdateToAllClients(x, y, check); // 모든 클라이언트에게 업데이트된 좌표와 값을 전송
+
                 currentPlayer.turn = false; // 현재 플레이어의 턴 종료
                 currentPlayer.x = -1; // x 값을 초기화
                 currentPlayer.y = -1; // y 값을 초기화
@@ -165,6 +167,12 @@ public class SubmarineServer {
                 e.printStackTrace();
             }
         }
+    }
+
+    // 모든 클라이언트에게 업데이트된 좌표와 값을 전송하는 메서드
+    private void sendUpdateToAllClients(int x, int y, int value) {
+        String message = "UPDATE:" + x + "," + y + "," + value;
+        sendtoall(message);
     }
 
     // 선택된 난이도를 설정하고 모든 클라이언트에게 알리는 메서드
