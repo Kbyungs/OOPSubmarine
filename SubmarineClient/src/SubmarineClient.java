@@ -3,11 +3,11 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.Random;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import javax.swing.Timer; // 명확히 javax.swing.Timer를 사용
 
-// 클라이언트
 public class SubmarineClient extends JFrame {
     private JTextArea textArea; // 서버 메시지를 표시할 텍스트 영역
     private JButton abilityUseButton; // 능력 사용 버튼
@@ -382,6 +382,8 @@ public class SubmarineClient extends JFrame {
         public void actionPerformed(ActionEvent e) {
             if (myTurn) {
                 sendCoordinates(x, y); // 좌표 전송
+                buttons[x][y].setEnabled(false); // 클릭된 버튼 비활성화
+                myTurn = false; // 턴 종료
             }
         }
     }
