@@ -38,7 +38,7 @@ public class Map {
             return -1;
         }
     }
-    
+
     // 맵을 출력하는 메서드
     public void printMap(String [][] a) {
         System.out.println();
