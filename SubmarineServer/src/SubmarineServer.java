@@ -64,7 +64,7 @@ public class SubmarineServer {
         clients.get(1).send("waiting for the host to select difficulty..");
 
         // 플레이어 1의 난이도 선택 과정 진행
-        new Timer().schedule(new TimerTask() {
+        new java.util.Timer().schedule(new java.util.TimerTask() {
             @Override
             public void run() {
                 if (selectedDifficulty == null) {
@@ -95,6 +95,12 @@ public class SubmarineServer {
         }
 
         // 각 클라이언트로부터 받은 지뢰를 맵에 배치
+        synchronized (this) {
+            while (!allMinesReceived()) {
+                wait();
+            }
+        }
+
         for (Client c : clients) {
             for (int i = 0; i < num_mine; i++) {
                 int x = Integer.parseInt(c.mines[i][0]);
@@ -120,6 +126,13 @@ public class SubmarineServer {
                     }
                 }
                 Client currentPlayer = clients.get(currentPlayerIndex);
+
+                synchronized (currentPlayer) {
+                    while (currentPlayer.x == -1 || currentPlayer.y == -1) {
+                        currentPlayer.wait(); // x, y 값이 업데이트 될 때까지 대기
+                    }
+                }
+
                 int x = currentPlayer.x;
                 int y = currentPlayer.y;
 
@@ -143,6 +156,8 @@ public class SubmarineServer {
 
                 currentPlayer.send("" + check); // 클라이언트에게 결과 전송
                 currentPlayer.turn = false; // 현재 플레이어의 턴 종료
+                currentPlayer.x = -1; // x 값을 초기화
+                currentPlayer.y = -1; // y 값을 초기화
                 currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
                 clients.get(currentPlayerIndex).turn = true;
                 sendTurnMessage();
@@ -176,7 +191,7 @@ public class SubmarineServer {
             num_mine = 8;
             num_trs = 10;
         }
-        map = new Map(width, num_trs);
+        map = new Map(width, num_trs); // SubmarineMap으로 수정
     }
 
     // 클라이언트들에게 설정 값을 전송하는 메서드
@@ -261,25 +276,21 @@ public class SubmarineServer {
         ObjectInputStream objectInput = null;
         String userName = null;
         String[][] mines = null; // 클라이언트가 설정한 지뢰 위치
-        int x, y; // 현재 클라이언트 위치
+        int x = -1, y = -1; // 초기값을 -1로 설정
         int hp = 3; // 기본 HP 설정
         boolean alive = true; // 클라이언트 생존 여부
+        boolean firstTime = true;
         public boolean turn = false; // 클라이언트 턴 여부
 
         public Client(Socket socket) throws IOException, ClassNotFoundException {
             this.socket = socket;
             // 클라이언트 초기 설정
             try {
-                System.out.println("Initializing client...");
                 objectOutput = new ObjectOutputStream(socket.getOutputStream());
                 objectOutput.flush(); // flush() 추가
-                System.out.println("ObjectOutputStream created");
                 objectInput = new ObjectInputStream(socket.getInputStream());
-                System.out.println("ObjectInputStream created");
                 out = new PrintWriter(socket.getOutputStream(), true);
-                System.out.println("PrintWriter created");
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                System.out.println("BufferedReader created");
 
                 userName = (String) objectInput.readObject();
                 System.out.println("Received username: " + userName); // 예외 발생 가능 부분 디버그 추가
@@ -310,8 +321,8 @@ public class SubmarineServer {
                         if (parts.length == 2 && isNumeric(parts[0]) && isNumeric(parts[1])) {
                             x = Integer.parseInt(parts[0]);
                             y = Integer.parseInt(parts[1]);
-                            synchronized (SubmarineServer.this) {
-                                SubmarineServer.this.notifyAll();
+                            synchronized (this) {
+                                this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
                             }
                         } else {
                             send("Invalid input. Please enter valid coordinates.");
@@ -321,7 +332,6 @@ public class SubmarineServer {
                         setDifficulty(difficulty);
                         setGameSettings(difficulty);
                         sendSettingsToClients();
-                        promptMinesPlacement();
                     } else if (msg.startsWith("ABILITY:")) {
                         String ability = msg.substring(8);
                         savePlayerAbility(this, ability);
@@ -334,8 +344,11 @@ public class SubmarineServer {
                     } else if (msg.equals("MINES:SET")) {
                         mines = (String[][]) objectInput.readObject();
                         System.out.println(userName + " has set mines: " + Arrays.deepToString(mines));
-                        synchronized (SubmarineServer.this) {
-                            SubmarineServer.this.notifyAll();
+                        if (allMinesReceived()) {
+                            System.out.println("둘다 지뢰 보냈음");
+                            synchronized (SubmarineServer.this) {
+                                SubmarineServer.this.notifyAll();
+                            }
                         }
                     } else {
                         if (turn && alive) {
@@ -346,6 +359,9 @@ public class SubmarineServer {
                                     y = Integer.parseInt(arr[1]);
                                     send("ok");
                                     turn = false;
+                                    synchronized (this) {
+                                        this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
+                                    }
                                 } else {
                                     send("Invalid input. Please enter valid coordinates.");
                                 }
