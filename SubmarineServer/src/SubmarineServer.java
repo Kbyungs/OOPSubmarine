@@ -29,14 +29,27 @@ public class SubmarineServer {
         numPlayer = 0;
         // 최대 플레이어 수만큼 클라이언트의 연결을 기다림
         while (numPlayer < maxPlayer) {
-            Socket socket = server.accept(); // 클라이언트의 연결을 수락
-            Client c = new Client(socket); // 클라이언트 객체 생성
-            clients.add(c); // 클라이언트 리스트에 추가
-            numPlayer++; // 현재 접속한 플레이어 수 증가
-            // 웰컴 메시지 전송
-            sendtoall(c.userName + " joined");
-            c.send("welcome! " + c.userName);
-            System.out.println("\n" + numPlayer + "/" + maxPlayer + " players join");
+            try {
+                System.out.println("Waiting for a client to connect...");
+                Socket socket = server.accept(); // 클라이언트의 연결을 수락
+                System.out.println("Client connected from " + socket.getInetAddress());
+
+                try {
+                    Client c = new Client(socket); // 클라이언트 객체 생성
+                    clients.add(c); // 클라이언트 리스트에 추가
+                    numPlayer++; // 현재 접속한 플레이어 수 증가
+                    // 웰컴 메시지 전송
+                    sendtoall(c.userName + " joined");
+                    c.send("welcome! " + c.userName);
+                    System.out.println("\n" + numPlayer + "/" + maxPlayer + " players join");
+                } catch (IOException | ClassNotFoundException e) {
+                    System.err.println("Error during client initialization: ");
+                    e.printStackTrace();  // 스택 트레이스 출력
+                    socket.close();
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to connect to client: " + e.getMessage());
+            }
         }
 
         System.out.println("\n" + numPlayer + " players join");
@@ -47,7 +60,6 @@ public class SubmarineServer {
         }
 
         // 난이도 선택
-        // 플레이어 1(방장), 플레이어 2에게 각각 메시지 전송
         clients.get(0).send("you are the host"); // 방장에게 난이도 선택 메시지 전송
         clients.get(1).send("waiting for the host to select difficulty..");
 
@@ -58,6 +70,7 @@ public class SubmarineServer {
                 if (selectedDifficulty == null) {
                     setDifficulty("Beginner");
                     sendSettingsToClients();
+                    promptMinesPlacement();
                 }
             }
         }, 20000); // 20초 후 실행
@@ -174,6 +187,33 @@ public class SubmarineServer {
         }
     }
 
+    // 지뢰 위치 입력을 클라이언트들에게 요청하는 메서드
+    private void promptMinesPlacement() {
+        for (Client c : clients) {
+            c.send("Please set your mine positions.");
+        }
+
+        synchronized (this) {
+            while (!allMinesReceived()) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    // 모든 클라이언트로부터 지뢰 위치를 받았는지 확인하는 메서드
+    private boolean allMinesReceived() {
+        for (Client c : clients) {
+            if (c.mines == null || c.mines.length != num_mine) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // 모든 클라이언트에게 메시지를 전송하는 메서드
     public void sendtoall(String msg) {
         for (Client c : clients) {
@@ -213,10 +253,12 @@ public class SubmarineServer {
     }
 
     // 클라이언트 클래스
-    class Client extends Thread {
+    public class Client extends Thread {
         Socket socket;
         PrintWriter out = null;
         BufferedReader in = null;
+        ObjectOutputStream objectOutput = null;
+        ObjectInputStream objectInput = null;
         String userName = null;
         String[][] mines = null; // 클라이언트가 설정한 지뢰 위치
         int x, y; // 현재 클라이언트 위치
@@ -224,22 +266,32 @@ public class SubmarineServer {
         boolean alive = true; // 클라이언트 생존 여부
         public boolean turn = false; // 클라이언트 턴 여부
 
-        public Client(Socket socket) throws Exception {
-            initial(socket); // 초기 설정
-            start(); // 쓰레드 시작
-        }
-
-        // 클라이언트 초기 설정 메서드
-        public void initial(Socket socket) throws IOException, ClassNotFoundException {
+        public Client(Socket socket) throws IOException, ClassNotFoundException {
             this.socket = socket;
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            ObjectInputStream objectInput = new ObjectInputStream(socket.getInputStream());
+            // 클라이언트 초기 설정
+            try {
+                System.out.println("Initializing client...");
+                objectOutput = new ObjectOutputStream(socket.getOutputStream());
+                objectOutput.flush(); // flush() 추가
+                System.out.println("ObjectOutputStream created");
+                objectInput = new ObjectInputStream(socket.getInputStream());
+                System.out.println("ObjectInputStream created");
+                out = new PrintWriter(socket.getOutputStream(), true);
+                System.out.println("PrintWriter created");
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                System.out.println("BufferedReader created");
 
-            userName = (String) objectInput.readObject(); // 클라이언트의 사용자 이름 수신
-            // mines = (String[][]) objectInput.readObject(); // 클라이언트의 지뢰 위치 수신 (나중에 설정)
-            System.out.println(userName + " joins from " + socket.getInetAddress());
-            send("wait for other player.."); // 대기 메시지 전송
+                userName = (String) objectInput.readObject();
+                System.out.println("Received username: " + userName); // 예외 발생 가능 부분 디버그 추가
+                System.out.println(userName + " joins from " + socket.getInetAddress());
+                send("wait for other player..");
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("Error during client initialization: " + e.getMessage());
+                e.printStackTrace();  // 스택 트레이스 출력
+                throw e;
+            }
+
+            start(); // 쓰레드 시작
         }
 
         @Override
@@ -247,86 +299,66 @@ public class SubmarineServer {
             String msg;
             try {
                 while (true) {
-                    msg = in.readLine(); // 클라이언트로부터 메시지 수신
-                    if (msg.startsWith("MOVE:")) { // 이동 명령 처리
+                    msg = in.readLine();
+                    if (msg == null) {
+                        System.out.println(userName + " disconnected.");
+                        break;
+                    }
+                    System.out.println("Received from " + userName + ": " + msg); // 디버그 메시지 추가
+                    if (msg.startsWith("MOVE:")) {
                         String[] parts = msg.substring(5).split(",");
-                        x = Integer.parseInt(parts[0]);
-                        y = Integer.parseInt(parts[1]);
-
-                        int check = map.checkMine(x, y); // 지뢰 체크
-                        String value;
-                        if (check == 99) {
-                            value = "99"; // 보물
-                            updateHP(userName, 1); // 보물 찾으면 HP 증가
-                        } else if (check == 98) {
-                            value = "98"; // 지뢰
-                            updateHP(userName, -1); // 지뢰 밟으면 HP 감소
+                        if (parts.length == 2 && isNumeric(parts[0]) && isNumeric(parts[1])) {
+                            x = Integer.parseInt(parts[0]);
+                            y = Integer.parseInt(parts[1]);
+                            synchronized (SubmarineServer.this) {
+                                SubmarineServer.this.notifyAll();
+                            }
                         } else {
-                            value = String.valueOf(check);
+                            send("Invalid input. Please enter valid coordinates.");
                         }
-                        map.updateMap(x, y); // 맵 업데이트
-                        sendtoall("UPDATE:" + x + "," + y + "," + value); // 업데이트 정보 전송
-
-                        // 현재 플레이어의 턴을 종료하고 다음 플레이어로 넘김
-                        turn = false;
-                        currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
-                        clients.get(currentPlayerIndex).turn = true;
-                        sendTurnMessage();
-                        synchronized (SubmarineServer.this) {
-                            SubmarineServer.this.notifyAll();
-                        }
-                    } else if (msg.startsWith("DIFFICULTY:")) { // 난이도 선택 메시지 처리
-                        String difficulty = msg.substring(11); // 선택한 난이도를 추출
-                        setDifficulty(difficulty); // 난이도 설정
-                        setGameSettings(difficulty); // 게임 설정
-                        sendSettingsToClients(); // 설정값 클라이언트에게 전송
-                    } else if (msg.startsWith("ABILITY:")) { // 능력 선택 메시지 처리
-                        String ability = msg.substring(8); // 선택한 능력 추출
-                        savePlayerAbility(this, ability); // 클라이언트의 능력 저장
-                        if (allPlayersChoseAbility()) { // 모든 플레이어가 능력을 선택했는지 확인
-                            sendtoall("능력 선택이 완료되었습니다."); // 능력 선택 완료 메시지 전송
+                    } else if (msg.startsWith("DIFFICULTY:")) {
+                        String difficulty = msg.substring(11);
+                        setDifficulty(difficulty);
+                        setGameSettings(difficulty);
+                        sendSettingsToClients();
+                        promptMinesPlacement();
+                    } else if (msg.startsWith("ABILITY:")) {
+                        String ability = msg.substring(8);
+                        savePlayerAbility(this, ability);
+                        if (allPlayersChoseAbility()) {
+                            sendtoall("능력 선택이 완료되었습니다.");
                             synchronized (SubmarineServer.this) {
                                 SubmarineServer.this.notifyAll();
                             }
                         }
+                    } else if (msg.equals("MINES:SET")) {
+                        mines = (String[][]) objectInput.readObject();
+                        System.out.println(userName + " has set mines: " + Arrays.deepToString(mines));
+                        synchronized (SubmarineServer.this) {
+                            SubmarineServer.this.notifyAll();
+                        }
                     } else {
-                        if (turn && alive) { // 턴과 생존 여부 확인
+                        if (turn && alive) {
                             try {
                                 String[] arr = msg.split(",");
-                                if (arr.length == 2 && isNumeric(arr[0]) && isNumeric(arr[1])) { // 유효한 좌표인지 확인
+                                if (arr.length == 2 && isNumeric(arr[0]) && isNumeric(arr[1])) {
                                     x = Integer.parseInt(arr[0]);
                                     y = Integer.parseInt(arr[1]);
-                                    send("ok"); // 유효한 좌표 응답
-                                    turn = false; // 턴 종료
+                                    send("ok");
+                                    turn = false;
                                 } else {
-                                    send("Invalid input. Please enter valid coordinates."); // 유효하지 않은 입력 응답
+                                    send("Invalid input. Please enter valid coordinates.");
                                 }
                             } catch (NumberFormatException e) {
                                 System.out.println("Invalid input: " + msg);
-                                send("Invalid input. Please enter valid coordinates."); // 유효하지 않은 입력 응답
+                                send("Invalid input. Please enter valid coordinates.");
                             }
                         }
                     }
                 }
-            } catch (IOException e) {
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("Error during client communication: " + e.getMessage());
                 e.printStackTrace();
-            }
-        }
-
-        // 플레이어의 HP를 업데이트하는 메서드
-        private void updateHP(String userName, int delta) {
-            for (Client c : clients) {
-                if (c.userName.equals(userName)) {
-                    c.hp += delta;
-                    sendtoall(c.userName + " HP: " + c.hp); // HP 정보 전송
-                    if (c.hp <= 0) { // 플레이어가 사망했는지 확인
-                        c.alive = false;
-                        sendtoall(c.userName + " has died."); // 사망 정보 전송
-                        sendtoall("Game Over"); // 게임 종료 정보 전송
-                        System.out.println("Game Over");
-                        break;
-                    }
-                }
             }
         }
 
