@@ -31,6 +31,9 @@ public class SubmarineClient extends JFrame {
     private boolean myTurn = false;
     private boolean isHost = false; // 방장 여부 확인
 
+    // 버튼의 활성화/비활성화 상태를 추적하기 위한 배열
+    private boolean[][] buttonStates;
+
     public SubmarineClient() {
         // GUI 구성 요소 초기화
         textArea = new JTextArea();
@@ -146,6 +149,7 @@ public class SubmarineClient extends JFrame {
         num_mine = Integer.parseInt(parts[1]);
 
         buttons = new JButton[width][width]; // 버튼 배열 초기화
+        buttonStates = new boolean[width][width]; // 버튼 상태 배열 초기화
         JPanel gridPanel = new JPanel(new GridLayout(width, width));
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < width; j++) {
@@ -153,6 +157,7 @@ public class SubmarineClient extends JFrame {
                 buttons[i][j].setPreferredSize(new Dimension(50, 50));
                 buttons[i][j].addActionListener(new ButtonListener(i, j)); // 버튼에 리스너 추가
                 gridPanel.add(buttons[i][j]);
+                buttonStates[i][j] = false; // 초기 상태는 false
             }
         }
         add(gridPanel, BorderLayout.SOUTH); // 그리드 패널을 남쪽에 추가
@@ -344,13 +349,20 @@ public class SubmarineClient extends JFrame {
         int x = Integer.parseInt(parts[0]);
         int y = Integer.parseInt(parts[1]);
         String value = parts[2];
-        buttons[x][y].setText(value); // 버튼에 값 설정
+
+        if (value.equals("99")) buttons[x][y].setText("T");
+        else if (value.equals("98")) buttons[x][y].setText("M");
+        else buttons[x][y].setText(value); // 버튼에 값 설정
+
         buttons[x][y].setEnabled(false); // 버튼 비활성화
+        buttonStates[x][y] = true; // 버튼 상태를 true로 설정
     }
 
     // 서버로 좌표를 전송하는 메서드
     private void sendCoordinates(int x, int y) {
-        if (myTurn) out.println("MOVE:" + x + "," + y);
+        if (myTurn && !buttonStates[x][y]) { // 버튼이 활성화되어 있는 경우에만
+            out.println("MOVE:" + x + "," + y);
+        }
     }
 
     // 모든 버튼을 비활성화하는 메서드
@@ -365,7 +377,9 @@ public class SubmarineClient extends JFrame {
     private void enableAllButtons() {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < width; j++) {
-                buttons[i][j].setEnabled(true);
+                if (!buttonStates[i][j]) { // 버튼이 비활성화되어 있지 않은 경우에만
+                    buttons[i][j].setEnabled(true);
+                }
             }
         }
     }
@@ -380,9 +394,10 @@ public class SubmarineClient extends JFrame {
         }
 
         public void actionPerformed(ActionEvent e) {
-            if (myTurn) {
+            if (myTurn && !buttonStates[x][y]) { // 버튼이 활성화되어 있는 경우에만
                 sendCoordinates(x, y); // 좌표 전송
                 buttons[x][y].setEnabled(false); // 클릭된 버튼 비활성화
+                buttonStates[x][y] = true; // 버튼 상태를 true로 설정
                 myTurn = false; // 턴 종료
             }
         }
