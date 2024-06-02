@@ -123,6 +123,10 @@ public class SubmarineClient extends JFrame {
                                 if (myTurn) {
                                     enableAllButtons();
                                 }
+                            } else if (message.startsWith("BUTTONBLACK:")) {
+                                setButtonColorBlack(message.substring(12));
+                            } else if (message.startsWith("MINECHECK:")) {
+                            	explore(message.substring(10));
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 if (message.equals("Game Over") || message.contains("has died")) {
@@ -256,7 +260,7 @@ public class SubmarineClient extends JFrame {
         Map<String, String> abilities = getAbilities();
 
         // 버튼 패널 생성 및 버튼 추가
-        JPanel buttonPanel = new JPanel(new GridLayout(0, 2)); // 2열의 그리드 레이아웃
+        JPanel buttonPanel = new JPanel(new GridLayout(0, 3)); // 3열의 그리드 레이아웃
 
         for (String abilityKey : abilities.keySet()) {
             JButton abilityButton = new JButton(abilities.get(abilityKey));
@@ -300,8 +304,7 @@ public class SubmarineClient extends JFrame {
         Map<String, String> abilities = new HashMap<>();
         abilities.put("1", "탐색");
         abilities.put("2", "발화");
-        abilities.put("3", "거인");
-        abilities.put("4", "강탈");
+        abilities.put("3", "회복");
         return abilities;
     }
 
@@ -316,9 +319,6 @@ public class SubmarineClient extends JFrame {
             case "3":
                 healing();
                 break;
-            case "4":
-                steal();
-                break;
             default:
                 System.out.println(userName + " 님은 능력이 없습니다.");
                 break;
@@ -329,28 +329,25 @@ public class SubmarineClient extends JFrame {
     public void showExploreGUI() {
         String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
         String[] temp = input.split(",");
-        int x = Integer.parseInt(temp[0].trim());
-        int y = Integer.parseInt(temp[1].trim());
-        explore(x, y);
+        int x = Integer.parseInt(temp[0]);
+        int y = Integer.parseInt(temp[1]);
+        out.println("MINECHECK:" + x + "," + y);
         temp[0] = null;
         temp[1] = null;
     }
 
     // 탐색 능력 구현
-    public void explore(int x, int y) {
-        boolean f = false;
-        for (int i = 0; i < num_mine; i++) {
-            if (Integer.parseInt(mines[i][0]) == x && Integer.parseInt(mines[i][1]) == y) {
-                f = true;
-            }
-        }
-
-        if (f) {
-            textArea.append("해당 위치는 지뢰가 있습니다\n");
+    public void explore(String msg) {
+    	String[] parts = msg.split(",");
+    	int x = Integer.parseInt(parts[0]);
+    	int y = Integer.parseInt(parts[1]);
+    	int r = Integer.parseInt(parts[2]);
+    	if (r == 1) {
+    		textArea.append("해당 위치는 지뢰가 있습니다\n");
             buttons[x][y].setBackground(Color.RED);
-        } else {
-            textArea.append("해당 위치는 지뢰가 없습니다\n");
-        }
+    	} else if (r == 0) {
+    		textArea.append("해당 위치는 지뢰가 없습니다\n");
+    	}
     }
 
     // 발화 능력 입력창 띄우기
@@ -365,19 +362,13 @@ public class SubmarineClient extends JFrame {
     }
 
     public void ingite(int x, int y) {
-        buttons[x][y].setBackground(Color.BLACK);
-        buttons[x][y].setEnabled(false);
+    	out.println("BUTTONBLACK:" + x + "," + y);
     }
 
     // 회복 능력 구현
     public void healing() {
         out.println("HEALING:" + "1");
         textArea.append("체력을 1 회복했습니다!\n");
-    }
-
-    public void steal() {
-        out.println("STEAL");
-        textArea.append("상대방의 턴을 뺐어왔습니다!\n");
     }
 
     // 서버로부터의 업데이트 메시지를 처리하는 메서드
@@ -482,6 +473,14 @@ public class SubmarineClient extends JFrame {
             System.err.println("Error while exiting the game: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    private void setButtonColorBlack(String msg) {
+    	String[] parts = msg.split(",");
+    	int x = Integer.parseInt(parts[0]);
+    	int y = Integer.parseInt(parts[1]);
+    	buttons[x][y].setBackground(Color.BLACK);
+    	buttons[x][y].setEnabled(false);
     }
 
 
