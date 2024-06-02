@@ -31,8 +31,8 @@ public class SubmarineClient extends JFrame {
     private boolean isHost = false;
     private boolean[][] buttonStates;
 
-    private JLabel player1Label;
-    private JLabel player2Label;
+    private JLabel playerLabel;
+    private JLabel opponentLabel;
 
     public SubmarineClient() {
         setTitle("MZ뢰찾기");
@@ -40,10 +40,10 @@ public class SubmarineClient extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         JPanel topPanel = new JPanel(new GridLayout(1, 2));
-        player1Label = new JLabel("Player 1: ");
-        player2Label = new JLabel("Player 2: ");
-        topPanel.add(player1Label);
-        topPanel.add(player2Label);
+        playerLabel = new JLabel("Player: ");
+        opponentLabel = new JLabel("Opponent: ");
+        topPanel.add(playerLabel);
+        topPanel.add(opponentLabel);
         add(topPanel, BorderLayout.NORTH);
 
         textArea = new JTextArea();
@@ -404,7 +404,7 @@ public class SubmarineClient extends JFrame {
 
     private void appendText(String message) {
         SwingUtilities.invokeLater(() -> {
-            textArea.append(message);
+            textArea.append(message + "\n");
             textArea.setCaretPosition(textArea.getDocument().getLength());
         });
     }
@@ -412,9 +412,9 @@ public class SubmarineClient extends JFrame {
     private void updatePlayerLabels(String message) {
         SwingUtilities.invokeLater(() -> {
             if (message.contains(userName)) {
-                player1Label.setText("Player: " + userName + " (HP: " + message.split("HP: ")[1] + ")");
+                playerLabel.setText(userName + ": " + message.split("HP: ")[1] + " HP");
             } else {
-                player2Label.setText("Opponent (HP: " + message.split("HP: ")[1] + ")");
+                opponentLabel.setText("Opponent: " + message.split("HP: ")[1] + " HP");
             }
         });
     }
