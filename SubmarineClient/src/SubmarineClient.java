@@ -3,9 +3,10 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.Random;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import javax.swing.Timer; // 명확히 javax.swing.Timer를 사용
 
 public class SubmarineClient extends JFrame {
     private JTextArea textArea; // 서버 메시지를 표시할 텍스트 영역
@@ -15,56 +16,50 @@ public class SubmarineClient extends JFrame {
     private PrintWriter out; // 서버로의 출력 스트림
     private BufferedReader in; // 서버로부터의 입력 스트림
     private ObjectOutputStream objectOut; // 객체 전송용 출력 스트림
-    private Map map;
+    private ObjectInputStream objectIn; // 객체 수신용 입력 스트림
 
     private String userName; // 사용자 이름
     private String ip; // 서버 IP 주소
     private String[][] mines; // 지뢰 위치 배열
-    private static final int num_mine = 3; // 지뢰 수
-    private static final int width = 9; // 맵 너비
+    private static int num_mine; // 지뢰 수
+    private static int width; // 맵 너비
     private Timer timer; // 선택 시간 타이머
     private Timer aTimer; // 능력 선택 시간 타이머
     private int abilityUseCount = 1;
     private String abilitySave;
-    
+
     private boolean myTurn = false;
+    private boolean isHost = false; // 방장 여부 확인
+
+    private int treasuresFound = 0; // 찾은 보물의 개수를 저장
+    private int minesHit = 0;     // 밟은 지뢰의 개수를 저장
+
+    // 버튼의 활성화/비활성화 상태를 추적하기 위한 배열
+    private boolean[][] buttonStates;
 
     public SubmarineClient() {
         // GUI 구성 요소 초기화
         textArea = new JTextArea();
         textArea.setEditable(false); // 텍스트 영역은 수정 불가
-        buttons = new JButton[width][width];
         abilityUseButton = new JButton("능력 발동");
         abilityUseButton.setPreferredSize(new Dimension(100, 600));
-        
+
         abilityUseButton.addActionListener(new ActionListener() {
-        	public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent e) {
                 if (abilityUseCount != 0) {
-                	abilityUseCount--;
-                	textArea.append("능력 발동!\n");
+                    abilityUseCount--;
+                    System.out.println("능력 발동!");
                     performAbility();
+                    abilityUseButton.setEnabled(false);
                     out.println("USE_ABILITY:" + userName); // 서버로 능력 사용 메시지 전송
                 } else {
-                	textArea.append("능력을 모두 사용했습니다.\n");
+                    System.out.println("능력을 모두 사용했습니다.");
                 }
             }
-        });	
-
-        
-        // 그리드 레이아웃 설정
-        JPanel gridPanel = new JPanel(new GridLayout(width, width));
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < width; j++) {
-                buttons[i][j] = new JButton();
-                buttons[i][j].setPreferredSize(new Dimension(50, 50));
-                buttons[i][j].addActionListener(new ButtonListener(i, j)); // 버튼에 리스너 추가
-                gridPanel.add(buttons[i][j]);
-            }
-        }
+        });
 
         setLayout(new BorderLayout());
         add(new JScrollPane(textArea), BorderLayout.CENTER); // 텍스트 영역을 중앙에 추가
-        add(gridPanel, BorderLayout.SOUTH); // 그리드 패널을 남쪽에 추가
         add(abilityUseButton, BorderLayout.EAST); // 채팅창 옆에 능력 사용 버튼 추가
 
         // 창 설정
@@ -72,42 +67,44 @@ public class SubmarineClient extends JFrame {
         setSize(600, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setVisible(true);
-        
-        // 사용자 이름 및 지뢰 위치 입력 받기
+
+        // 사용자 이름 및 서버 IP 입력 받기
         userName = JOptionPane.showInputDialog(this, "Enter your username:");
         ip = JOptionPane.showInputDialog(this, "Enter IP:");
-        mines = new String[num_mine][2];
-        for (int i = 0; i < num_mine; i++) {
-            String input = JOptionPane.showInputDialog(this, "Enter mine coordinates (x,y) for mine " + (i + 1) + ":");
-            String[] temp = input.split(",");
-            for (int j = 0; j < 2; j++)
-                mines[i][j] = temp[j];
-        }
 
         // 서버와 연결
         connectToServer();
     }
 
-    
     // 서버와의 연결 설정 메서드
     private void connectToServer() {
         try {
+            System.out.println("Attempting to connect to the server at " + ip + ":" + 9999);
             socket = new Socket(ip, 9999); // 서버 소켓에 연결
-            out = new PrintWriter(socket.getOutputStream(), true); // 출력 스트림 설정
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // 입력 스트림 설정
+            System.out.println("Connected to the server.");
             objectOut = new ObjectOutputStream(socket.getOutputStream()); // 객체 출력 스트림 설정
+            objectOut.flush(); // flush() 추가
+            System.out.println("ObjectOutputStream created");
 
-            // 사용자 이름 및 지뢰 정보를 서버로 전송
+            out = new PrintWriter(socket.getOutputStream(), true); // 출력 스트림 설정
+            System.out.println("PrintWriter created");
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // 입력 스트림 설정
+            System.out.println("BufferedReader created");
+            objectIn = new ObjectInputStream(socket.getInputStream()); // 객체 입력 스트림 설정
+            System.out.println("ObjectInputStream created");
+
+            // 사용자 이름 서버로 전송
             objectOut.writeObject(userName);
-            objectOut.writeObject(mines);
-            objectOut.flush();
+            objectOut.flush(); // flush() 추가
+            System.out.println("Username sent to server");
 
             // 서버로부터의 메시지를 수신하는 스레드 시작
             new Thread(new Runnable() {
                 public void run() {
                     try {
                         String message;
-                        while ((message = in.readLine()) != null) { // 서버로부터 메시지를 수신
+                        while ((message = in.readLine()) != null) { // 서버로부터 메시지 수신
+                            System.out.println("Received from server: " + message); // 디버그 메시지 추가
                             if (message.startsWith("UPDATE:")) { // 업데이트 메시지 처리
                                 handleUpdate(message.substring(7));
                             } else if (message.equals("your turn")) {
@@ -116,26 +113,76 @@ public class SubmarineClient extends JFrame {
                             } else if (message.equals("not your turn")) {
                                 myTurn = false;
                                 disableAllButtons();
+                            } else if (message.equals("you are the host")) {
+                                isHost = true;
+                                showDifficultySelection(); // 방장일 경우 난이도 선택
+                            } else if (message.startsWith("SETTINGS:")) {
+                                handleSettings(message.substring(9)); // 난이도 설정 후 초기화
+                            } else if (message.equals("Start Game")) {
+                                textArea.append("Game is starting...\n"); // 게임 시작 메시지 표시
+                                if (myTurn) {
+                                    enableAllButtons();
+                                }
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 if (message.equals("Game Over") || message.contains("has died")) {
                                     disableAllButtons(); // 게임 종료 시 버튼 비활성화
+                                    showGameEndDialog(); // 게임 종료 대화 상자 표시
                                     break; // 게임 종료 시 루프 탈출
                                 }
-                                if (message.contains("당신은 방장입니다")) {
-                                    showDifficultySelection(); // 방장에게 난이도 선택 창 표시
-                                } else if (message.contains("능력을 선택해주세요")) { // 능력 선택 메시지 수신 시
+                                if (message.contains("능력을 선택해주세요")) { // 능력 선택 메시지 수신 시
                                     showAbilitySelection(); // 능력 선택 창 표시
-                                } 
+                                }
                             }
                         }
-                    }
-                    catch (IOException e) {
+                    } catch (IOException e) {
+                        System.err.println("Error during server communication: " + e.getMessage());
                         e.printStackTrace();
                     }
                 }
             }).start();
         } catch (IOException e) {
+            System.err.println("Failed to connect to the server: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // 서버로부터의 설정 메시지를 처리하는 메서드
+    private void handleSettings(String settings) {
+        String[] parts = settings.split(",");
+        width = Integer.parseInt(parts[0]);
+        num_mine = Integer.parseInt(parts[1]);
+
+        buttons = new JButton[width][width]; // 버튼 배열 초기화
+        buttonStates = new boolean[width][width]; // 버튼 상태 배열 초기화
+        JPanel gridPanel = new JPanel(new GridLayout(width, width));
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < width; j++) {
+                buttons[i][j] = new JButton();
+                buttons[i][j].setPreferredSize(new Dimension(50, 50));
+                buttons[i][j].addActionListener(new ButtonListener(i, j)); // 버튼에 리스너 추가
+                gridPanel.add(buttons[i][j]);
+                buttonStates[i][j] = false; // 초기 상태는 false
+            }
+        }
+        add(gridPanel, BorderLayout.SOUTH); // 그리드 패널을 남쪽에 추가
+        revalidate();
+        repaint();
+
+        // 지뢰 위치 입력 받기
+        mines = new String[num_mine][2];
+        for (int i = 0; i < num_mine; i++) {
+            String input = JOptionPane.showInputDialog(this, "Enter mine coordinates (x,y) for mine " + (i + 1) + ":");
+            String[] temp = input.split(",");
+            for (int j = 0; j < 2; j++)
+                mines[i][j] = temp[j];
+        }
+        try {
+            out.println("MINES:SET");
+            objectOut.writeObject(mines); // 지뢰 위치 서버로 전송
+            objectOut.flush(); // flush() 추가
+        } catch (IOException e) {
+            System.err.println("Error during mine setting: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -144,7 +191,7 @@ public class SubmarineClient extends JFrame {
     private void showDifficultySelection() {
         // 난이도 선택 창 생성
         JDialog dialog = new JDialog(this, "난이도 선택", true);
-        dialog.setSize(600, 600);
+        dialog.setSize(600, 200);
         dialog.setLayout(new BorderLayout());
 
         // 난이도 선택 메시지 라벨
@@ -193,8 +240,8 @@ public class SubmarineClient extends JFrame {
 
         dialog.setVisible(true);
     }
-    
-    // 능력 선택창을 표시하는 메서드
+
+ // 능력 선택 창을 표시하는 메서드
     public void showAbilitySelection() {
         // 능력 선택 창 생성
         JDialog dialog = new JDialog(this, "능력 선택", true);
@@ -207,7 +254,7 @@ public class SubmarineClient extends JFrame {
 
         // 능력 목록 가져오기
         Map<String, String> abilities = getAbilities();
-        
+
         // 버튼 패널 생성 및 버튼 추가
         JPanel buttonPanel = new JPanel(new GridLayout(0, 2)); // 2열의 그리드 레이아웃
 
@@ -228,11 +275,11 @@ public class SubmarineClient extends JFrame {
         }
 
         dialog.add(buttonPanel, BorderLayout.CENTER);
-        
+
         // 타이머 메시지 라벨
         JLabel aTimerLabel = new JLabel("30초간 선택하지 않으면 무작위 능력이 부여됩니다", JLabel.CENTER);
         dialog.add(aTimerLabel, BorderLayout.SOUTH);
-        
+
         // 30초 후 무작위 능력으로 설정
         aTimer = new Timer(30000, new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -248,39 +295,39 @@ public class SubmarineClient extends JFrame {
         dialog.setVisible(true);
     }
 
-    // 능력 목록을 반환하는 메서드 
+    // 능력 목록을 반환하는 메서드
     private Map<String, String> getAbilities() {
         Map<String, String> abilities = new HashMap<>();
         abilities.put("1", "탐색");
         abilities.put("2", "발화");
-        abilities.put("3", "회복");
+        abilities.put("3", "거인");
         abilities.put("4", "강탈");
         return abilities;
     }
-    
+
     public void performAbility() {
         switch (abilitySave) {
             case "1":
-            	showExploreGUI();
+                showExploreGUI();
                 break;
             case "2":
-            	showIgniteGUI();
+                showIgniteGUI();
                 break;
             case "3":
-            	healing();
+                healing();
                 break;
             case "4":
-            	steal();
+                steal();
                 break;
             default:
                 System.out.println(userName + " 님은 능력이 없습니다.");
                 break;
         }
     }
-    
+
     // 탐색 능력 입력창 띄우기
     public void showExploreGUI() {
-    	String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
+        String input = JOptionPane.showInputDialog(this, "탐색을 원하는 좌표를 입력하세요" + ":");
         String[] temp = input.split(",");
         int x = Integer.parseInt(temp[0].trim());
         int y = Integer.parseInt(temp[1].trim());
@@ -288,27 +335,27 @@ public class SubmarineClient extends JFrame {
         temp[0] = null;
         temp[1] = null;
     }
-    
+
     // 탐색 능력 구현
     public void explore(int x, int y) {
-    	boolean f = false;
-    	for (int i = 0; i < num_mine; i++) {
-    		if (Integer.parseInt(mines[i][0]) == x && Integer.parseInt(mines[i][1]) == y) {
-    			f = true;
-    		}
+        boolean f = false;
+        for (int i = 0; i < num_mine; i++) {
+            if (Integer.parseInt(mines[i][0]) == x && Integer.parseInt(mines[i][1]) == y) {
+                f = true;
+            }
         }
-    	
-    	if (f) { 
+
+        if (f) {
             textArea.append("해당 위치는 지뢰가 있습니다\n");
             buttons[x][y].setBackground(Color.RED);
         } else {
             textArea.append("해당 위치는 지뢰가 없습니다\n");
-        }    
+        }
     }
-    
+
     // 발화 능력 입력창 띄우기
     public void showIgniteGUI() {
-    	String input = JOptionPane.showInputDialog(this, "불태우기를 원하는 좌표를 입력하세요" + ":");
+        String input = JOptionPane.showInputDialog(this, "불태우기를 원하는 좌표를 입력하세요" + ":");
         String[] temp = input.split(",");
         int x = Integer.parseInt(temp[0].trim());
         int y = Integer.parseInt(temp[1].trim());
@@ -316,23 +363,22 @@ public class SubmarineClient extends JFrame {
         temp[0] = null;
         temp[1] = null;
     }
-    
+
     public void ingite(int x, int y) {
-    	buttons[x][y].setBackground(Color.BLACK);
-    	buttons[x][y].setEnabled(false);  
+        buttons[x][y].setBackground(Color.BLACK);
+        buttons[x][y].setEnabled(false);
     }
-    
+
     // 회복 능력 구현
     public void healing() {
-    	out.println("HEALING:" + "1");
-    	textArea.append("체력을 1 회복했습니다!\n");
+        out.println("HEALING:" + "1");
+        textArea.append("체력을 1 회복했습니다!\n");
     }
-    
+
     public void steal() {
-    	out.println("STEAL");
-    	textArea.append("상대방의 턴을 뺐어왓습니다!\n");
+        out.println("STEAL");
+        textArea.append("상대방의 턴을 뺐어왔습니다!\n");
     }
-    
 
     // 서버로부터의 업데이트 메시지를 처리하는 메서드
     private void handleUpdate(String update) {
@@ -340,13 +386,20 @@ public class SubmarineClient extends JFrame {
         int x = Integer.parseInt(parts[0]);
         int y = Integer.parseInt(parts[1]);
         String value = parts[2];
-        buttons[x][y].setText(value); // 버튼에 값 설정
+
+        if (value.equals("99")) buttons[x][y].setText("T");
+        else if (value.equals("98")) buttons[x][y].setText("M");
+        else buttons[x][y].setText(value); // 버튼에 값 설정
+
         buttons[x][y].setEnabled(false); // 버튼 비활성화
+        buttonStates[x][y] = true; // 버튼 상태를 true로 설정
     }
 
     // 서버로 좌표를 전송하는 메서드
     private void sendCoordinates(int x, int y) {
-        if (myTurn) out.println("MOVE:" + x + "," + y);
+        if (myTurn && !buttonStates[x][y]) { // 버튼이 활성화되어 있는 경우에만
+            out.println("MOVE:" + x + "," + y);
+        }
     }
 
     // 모든 버튼을 비활성화하는 메서드
@@ -361,9 +414,89 @@ public class SubmarineClient extends JFrame {
     private void enableAllButtons() {
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < width; j++) {
-                buttons[i][j].setEnabled(true);
+                if (!buttonStates[i][j]) { // 버튼이 비활성화되어 있지 않은 경우에만
+                    buttons[i][j].setEnabled(true);
+                }
             }
         }
+    }
+    
+    private void requestGameStatistics() {
+        out.println("REQUEST_STATS");
+        // 통계 정보를 요청한 후, 루프 외부에서 통계 정보를 수신하고 처리하는 부분을 추가합니다.
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    String message;
+                    while ((message = in.readLine()) != null) { // 서버로부터 메시지 수신
+                        if (message.startsWith("STATS:")) {
+                            showGameStatistics(message);
+                            break; // 통계 정보를 수신한 후 루프를 종료합니다.
+                        }
+                    }
+                } catch (IOException e) {
+                    System.err.println("Error during server communication: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
+    // 게임 종료 시 대화 상자 표시
+    private void showGameEndDialog() {
+        int response = JOptionPane.showOptionDialog(
+            this,
+            "결과를 확인하려면 Yes, 종료를 원하면 No를 누르세요",
+            "Game Over",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            new String[]{"Yes", "No"},
+            "Yes"
+        );
+
+        if (response == JOptionPane.YES_OPTION) {
+            requestGameStatistics();
+        } else {
+            exitGame();
+        }
+    }
+    
+
+    private void exitGame() {
+        try {
+            // 서버에 종료 요청
+            out.println("EXIT_GAME");
+            
+            // 소켓 및 스트림 닫기
+            if (objectOut != null) objectOut.close();
+            if (objectIn != null) objectIn.close();
+            if (out != null) out.close();
+            if (in != null) in.close();
+            if (socket != null) socket.close();
+            
+            // 프로그램 종료
+            System.out.println("Game exited.");
+            System.exit(0);
+        } catch (IOException e) {
+            System.err.println("Error while exiting the game: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+
+    // 게임 통계 표시
+    private void showGameStatistics(String msg) {
+    	String stats = msg.substring(6);
+        String[] parts = stats.split(",");
+        treasuresFound = Integer.parseInt(parts[0]);
+        minesHit = Integer.parseInt(parts[1]);
+
+        String message = String.format(
+            "Found Treasures: %d\nStepped Mines: %d",
+            treasuresFound, minesHit
+        );
+        JOptionPane.showMessageDialog(this, message, "Game Statistics", JOptionPane.INFORMATION_MESSAGE);
     }
 
     // 버튼 클릭 리스너 클래스
@@ -376,7 +509,12 @@ public class SubmarineClient extends JFrame {
         }
 
         public void actionPerformed(ActionEvent e) {
-            sendCoordinates(x, y); // 좌표 전송
+            if (myTurn && !buttonStates[x][y]) { // 버튼이 활성화되어 있는 경우에만
+                sendCoordinates(x, y); // 좌표 전송
+                buttons[x][y].setEnabled(false); // 클릭된 버튼 비활성화
+                buttonStates[x][y] = true; // 버튼 상태를 true로 설정
+                myTurn = false; // 턴 종료
+            }
         }
     }
 
