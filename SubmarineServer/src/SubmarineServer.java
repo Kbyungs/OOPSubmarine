@@ -1,3 +1,5 @@
+// 서버 파일
+
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
@@ -158,6 +160,7 @@ public class SubmarineServer extends JFrame {
                 map.deployMine(x, y, c.userName.substring(0, 1));
             }
         }
+        map.deployTrs();
 
         map.numbering(); // 맵 번호 지정
         map.printMap(map.mineMap); // 맵 출력
@@ -218,8 +221,12 @@ public class SubmarineServer extends JFrame {
                     currentPlayer.alive = false; // 사망 처리
                     sendtoall(currentPlayer.userName + " has died.");
                     appendLog(currentPlayer.userName + " has died.");
-                    sendtoall("Game Over");
-                    appendLog("Game Over");
+                    determineGameOutcome();
+                    return; // 게임 종료
+                }
+
+                if (allTreasuresFound()) { // 모든 보물이 발견되었는지 확인
+                    determineGameOutcome();
                     return; // 게임 종료
                 }
 
@@ -372,6 +379,46 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 모든 보물이 발견되었는지 확인하는 메서드
+    private boolean allTreasuresFound() {
+        int totalTreasuresFound = 0;
+        for (Client client : clients) {
+            totalTreasuresFound += client.treasuresFound;
+        }
+        return totalTreasuresFound >= num_trs;
+    }
+
+    // 게임 결과를 결정하고 전송하는 메서드
+    private void determineGameOutcome() {
+        String winner = "";
+        String loser = "";
+
+        if (clients.get(0).hp <= 0) {
+            winner = clients.get(1).userName;
+            loser = clients.get(0).userName;
+        } else if (clients.get(1).hp <= 0) {
+            winner = clients.get(0).userName;
+            loser = clients.get(1).userName;
+        } else {
+            if (clients.get(0).treasuresFound > clients.get(1).treasuresFound) {
+                winner = clients.get(0).userName;
+                loser = clients.get(1).userName;
+            } else if (clients.get(1).treasuresFound > clients.get(0).treasuresFound) {
+                winner = clients.get(1).userName;
+                loser = clients.get(0).userName;
+            } else {
+                sendtoall("Game ended in a draw!");
+                appendLog("Game ended in a draw!");
+                return;
+            }
+        }
+
+        sendtoall("Winner: " + winner + ", Loser: " + loser);
+        appendLog("Winner: " + winner + ", Loser: " + loser);
+        sendtoall("Game Over");
+        appendLog("Game Over");
+    }
+
     // 클라이언트 클래스
     public class Client extends Thread {
         Socket socket;
@@ -454,6 +501,7 @@ public class SubmarineServer extends JFrame {
                         appendLog(userName + " has set mines: " + Arrays.deepToString(mines));
                         if (allMinesReceived()) {
                             appendLog("모든 플레이어가 지뢰를 설정하였습니다.");
+                            map.deployTrs();
                             synchronized (SubmarineServer.this) {
                                 SubmarineServer.this.notifyAll();
                             }
@@ -507,6 +555,7 @@ public class SubmarineServer extends JFrame {
                         sendtoall(c.userName + " has died."); // 사망 정보 전송
                         sendtoall("Game Over"); // 게임 종료 정보 전송
                         appendLog("Game Over");
+                        determineGameOutcome();
                         break;
                     }
                 }
