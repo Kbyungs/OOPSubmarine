@@ -187,8 +187,9 @@ public class SubmarineServer extends JFrame {
 
                 map.printMap(map.mineMap);
 
+                String result = "";
                 if (check == 99) {
-                    sendtoall(currentPlayer.userName + "보물발견!");
+                    result = currentPlayer.userName + " 보물 발견!";
                     currentPlayer.treasuresFound += 1;
                     if (currentPlayer.hp >= 3) {
                         sendtoall(currentPlayer.userName + "의 체력이 최대입니다");
@@ -197,14 +198,19 @@ public class SubmarineServer extends JFrame {
                     }
                 } else if (check == 98) {
                     if (!map.mineMap[x][y].equals(currentPlayer.userName.substring(0, 1))) {
-                        sendtoall(currentPlayer.userName + "는 상대방이 숨겨둔 지뢰를 밟았습니다");
+                        result = currentPlayer.userName + " 는 상대방이 숨겨둔 지뢰를 밟았습니다";
                         currentPlayer.hp -= 1;
                         currentPlayer.minesHit += 1;
                     } else {
-                        sendtoall(currentPlayer.userName + "는 본인이 숨긴 지뢰를 밟았습니다");
+                        result = currentPlayer.userName + " 는 본인이 숨긴 지뢰를 밟았습니다";
                     }
+                } else {
+                    result = currentPlayer.userName + "는 아무것도 찾지 못했습니다.";
                 }
-                sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
+
+                sendtoall(result); // 결과 정보 전송
+                appendLog(result); // 로그에 결과 추가
+                sendtoall("HP:" + currentPlayer.hp); // HP 정보 전송
                 if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
                     currentPlayer.alive = false; // 사망 처리
                     sendtoall(currentPlayer.userName + " has died.");
@@ -438,7 +444,7 @@ public class SubmarineServer extends JFrame {
                         mines = (String[][]) objectInput.readObject();
                         appendLog(userName + " has set mines: " + Arrays.deepToString(mines));
                         if (allMinesReceived()) {
-                            appendLog("둘다 지뢰 보냈음");
+                            appendLog("모든 플레이어가 지뢰를 설정하였습니다.");
                             synchronized (SubmarineServer.this) {
                                 SubmarineServer.this.notifyAll();
                             }
@@ -486,7 +492,7 @@ public class SubmarineServer extends JFrame {
             for (Client c : clients) {
                 if (c.userName.equals(userName)) {
                     c.hp += delta;
-                    sendtoall(c.userName + " HP: " + c.hp); // HP 정보 전송
+                    sendtoall("HP:" + c.hp); // HP 정보 전송
                     if (c.hp <= 0) { // 플레이어가 사망했는지 확인
                         c.alive = false;
                         sendtoall(c.userName + " has died."); // 사망 정보 전송
