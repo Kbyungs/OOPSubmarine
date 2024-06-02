@@ -388,20 +388,13 @@ public class SubmarineClient extends JFrame {
     }
 
     public void ingite(int x, int y) {
-        buttons[x][y].setBackground(Color.BLACK);
-        buttons[x][y].setEnabled(false);
+        out.println("BUTTONBLACK:" + x + "," + y);
     }
 
     // 회복 능력 구현
     public void healing() {
         out.println("HEALING:" + "1");
         textArea.append("체력을 1 회복했습니다!\n");
-        textArea.setCaretPosition(textArea.getDocument().getLength()); // 스크롤 자동 아래로
-    }
-
-    public void steal() {
-        out.println("STEAL");
-        textArea.append("상대방의 턴을 뺐어왔습니다!\n");
         textArea.setCaretPosition(textArea.getDocument().getLength()); // 스크롤 자동 아래로
     }
 
