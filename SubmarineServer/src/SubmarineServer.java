@@ -1,103 +1,116 @@
-import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.List; // 명시적으로 java.util.List를 임포트
 
 public class SubmarineServer extends JFrame {
-    public static int inPort = 9999;
-    public static Vector<Client> clients = new Vector<>();
-    public static int maxPlayer = 2;
-    public static int numPlayer = 0;
-    private int currentPlayerIndex = 0;
-    public static int width;
-    public static int num_trs;
-    public static int num_mine;
-    public static Map map;
-    public static String selectedDifficulty = null;
+    public static int inPort = 9999; // 서버가 수신할 포트 번호
+    public static Vector<Client> clients = new Vector<Client>(); // 연결된 클라이언트 목록
+    public static int maxPlayer = 2; // 최대 플레이어 수
+    public static int numPlayer = 0; // 현재 접속한 플레이어 수
+    private int currentPlayerIndex = 0; // 현재 플레이어 인덱스를 저장
+    public static int width; // 맵의 너비
+    public static int num_trs; // 맵에 배치될 보물의 수
+    public static int num_mine; // 각 플레이어가 배치할 지뢰의 수
+    public static Map map; // 게임 맵 객체
+    public static String selectedDifficulty = null; // 선택된 난이도
 
-    public static java.util.Map<String, String> abilities = new HashMap<>();
-    public static java.util.Map<Client, java.util.List<String>> playerAbilities = new HashMap<>();
+    public static java.util.Map<String, String> abilities = new HashMap<>(); // 능력 개수 풀
+    public static java.util.Map<Client, List<String>> playerAbilities = new HashMap<>(); // 플레이어가 선택한 능력 저장
 
-    private JTextArea logArea;
-    private JScrollPane logScrollPane;
-    private JLabel player1Label;
-    private JLabel player2Label;
+    private JTextArea player1LogArea;
+    private JTextArea player2LogArea;
+    private JLabel player1HpLabel;
+    private JLabel player2HpLabel;
 
     public static void main(String[] args) throws Exception {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                new SubmarineServer().createServer();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        new SubmarineServer().createServer(); // 서버 생성 및 실행
     }
 
     public SubmarineServer() {
+        // GUI 초기화
         setTitle("Submarine Server");
-        setSize(600, 400);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE); // x 버튼을 눌렀을 때 종료되도록 설정
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // 레이아웃 설정
         setLayout(new BorderLayout());
 
-        // 상단 패널에 플레이어 정보를 표시하는 레이블 추가
-        JPanel topPanel = new JPanel(new GridLayout(1, 2));
-        player1Label = new JLabel("Player 1: ");
-        player2Label = new JLabel("Player 2: ");
-        topPanel.add(player1Label);
-        topPanel.add(player2Label);
-        add(topPanel, BorderLayout.NORTH);
+        // 상단 패널
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new GridLayout(1, 2));
 
-        // 게임 이벤트를 로그로 표시하는 텍스트 영역 추가
-        logArea = new JTextArea();
-        logArea.setEditable(false);
-        logArea.setLineWrap(true);
-        logArea.setWrapStyleWord(true);
-        logScrollPane = new JScrollPane(logArea);
-        logScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        add(logScrollPane, BorderLayout.CENTER);
+        player1HpLabel = new JLabel("Player 1: ❤️ ❤️ ❤️");
+        player2HpLabel = new JLabel("Player 2: ❤️ ❤️ ❤️");
+        topPanel.add(player1HpLabel);
+        topPanel.add(player2HpLabel);
+
+        // 로그 영역
+        JPanel logPanel = new JPanel();
+        logPanel.setLayout(new GridLayout(1, 2));
+
+        player1LogArea = new JTextArea();
+        player1LogArea.setEditable(false);
+        JScrollPane player1ScrollPane = new JScrollPane(player1LogArea);
+        logPanel.add(player1ScrollPane);
+
+        player2LogArea = new JTextArea();
+        player2LogArea.setEditable(false);
+        JScrollPane player2ScrollPane = new JScrollPane(player2LogArea);
+        logPanel.add(player2ScrollPane);
+
+        add(topPanel, BorderLayout.NORTH);
+        add(logPanel, BorderLayout.CENTER);
 
         setVisible(true);
     }
 
+    // 서버를 생성하고 클라이언트 연결을 처리하는 메서드
     public void createServer() throws Exception {
-        appendLog("서버 시작 중...");
-        ServerSocket server = new ServerSocket(inPort);
+        appendLog("Server start running ..");
+        ServerSocket server = new ServerSocket(inPort); // 서버 소켓 생성
 
         numPlayer = 0;
+        // 최대 플레이어 수만큼 클라이언트의 연결을 기다림
         while (numPlayer < maxPlayer) {
             try {
-                appendLog("클라이언트 연결 대기 중...");
-                Socket socket = server.accept();
-                appendLog(socket.getInetAddress() + "에서 클라이언트 연결됨");
+                appendLog("Waiting for a client to connect...");
+                Socket socket = server.accept(); // 클라이언트의 연결을 수락
+                appendLog("Client connected from " + socket.getInetAddress());
 
                 try {
-                    Client c = new Client(socket);
-                    clients.add(c);
-                    numPlayer++;
+                    Client c = new Client(socket); // 클라이언트 객체 생성
+                    clients.add(c); // 클라이언트 리스트에 추가
+                    numPlayer++; // 현재 접속한 플레이어 수 증가
+                    // 웰컴 메시지 전송
                     sendtoall(c.userName + " joined");
                     c.send("welcome! " + c.userName);
-                    appendLog(numPlayer + "/" + maxPlayer + " players join");
-                    updatePlayerLabels();
+                    appendLog("\n" + numPlayer + "/" + maxPlayer + " players join");
                 } catch (IOException | ClassNotFoundException e) {
-                    appendLog("클라이언트 초기화 중 오류 발생: " + e.getMessage());
-                    e.printStackTrace();
+                    appendLog("Error during client initialization: ");
+                    e.printStackTrace();  // 스택 트레이스 출력
                     socket.close();
                 }
             } catch (IOException e) {
-                appendLog("클라이언트 연결 실패: " + e.getMessage());
+                appendLog("Failed to connect to client: " + e.getMessage());
             }
         }
 
-        appendLog(numPlayer + " players join");
+        appendLog("\n" + numPlayer + " players join");
+        // 각 클라이언트의 턴을 설정하고 사용자 이름 출력
         for (Client c : clients) {
             c.turn = true;
             appendLog("  - " + c.userName);
         }
 
-        clients.get(0).send("you are the host");
+        // 난이도 선택
+        clients.get(0).send("you are the host"); // 방장에게 난이도 선택 메시지 전송
         clients.get(1).send("waiting for the host to select difficulty..");
 
+        // 플레이어 1의 난이도 선택 과정 진행
         new java.util.Timer().schedule(new java.util.TimerTask() {
             @Override
             public void run() {
@@ -107,24 +120,28 @@ public class SubmarineServer extends JFrame {
                     promptMinesPlacement();
                 }
             }
-        }, 20000);
+        }, 20000); // 20초 후 실행
 
+        // 서버가 난이도를 설정한 후 클라이언트에게 전송
         synchronized (this) {
             while (selectedDifficulty == null) {
                 wait();
             }
         }
 
+        // 능력 선택 메시지 전송
         for (Client c : clients) {
             c.send("능력을 선택해주세요.");
         }
 
+        // 능력 선택 완료 대기
         synchronized (this) {
             while (!allPlayersChoseAbility()) {
                 wait();
             }
         }
 
+        // 각 클라이언트로부터 받은 지뢰를 맵에 배치
         synchronized (this) {
             while (!allMinesReceived()) {
                 wait();
@@ -139,14 +156,15 @@ public class SubmarineServer extends JFrame {
             }
         }
 
-        map.numbering();
-        map.printMap(map.mineMap);
+        map.numbering(); // 맵 번호 지정
+        map.printMap(map.mineMap); // 맵 출력
 
-        sendtoall("Start Game");
+        sendtoall("Start Game"); // 모든 클라이언트에게 게임 시작 메시지 전송
         appendLog("Game has started.");
         clients.get(currentPlayerIndex).turn = true;
         sendTurnMessage();
 
+        // 게임 진행 루프
         while (true) {
             try {
                 synchronized (this) {
@@ -158,46 +176,51 @@ public class SubmarineServer extends JFrame {
 
                 synchronized (currentPlayer) {
                     while (currentPlayer.x == -1 || currentPlayer.y == -1) {
-                        currentPlayer.wait();
+                        currentPlayer.wait(); // x, y 값이 업데이트 될 때까지 대기
                     }
                 }
 
                 int x = currentPlayer.x;
                 int y = currentPlayer.y;
 
-                int check = map.checkMine(x, y);
+                int check = map.checkMine(x, y); // 지뢰 체크
+
                 map.printMap(map.mineMap);
 
                 if (check == 99) {
-                    sendtoall(currentPlayer.userName + " 보물 발견!");
+                    sendtoall(currentPlayer.userName + "보물발견!");
+                    currentPlayer.treasuresFound += 1;
                     if (currentPlayer.hp >= 3) {
-                        sendtoall(currentPlayer.userName + " 의 체력이 최대입니다");
+                        sendtoall(currentPlayer.userName + "의 체력이 최대입니다");
                     } else {
                         currentPlayer.hp += 1;
                     }
                 } else if (check == 98) {
                     if (!map.mineMap[x][y].equals(currentPlayer.userName.substring(0, 1))) {
-                        sendtoall(currentPlayer.userName + " 는 상대방이 숨겨둔 지뢰를 밟았습니다");
+                        sendtoall(currentPlayer.userName + "는 상대방이 숨겨둔 지뢰를 밟았습니다");
                         currentPlayer.hp -= 1;
+                        currentPlayer.minesHit += 1;
                     } else {
-                        sendtoall(currentPlayer.userName + " 는 본인이 숨긴 지뢰를 밟았습니다");
+                        sendtoall(currentPlayer.userName + "는 본인이 숨긴 지뢰를 밟았습니다");
                     }
                 }
-                updatePlayerLabels();
-                if (currentPlayer.hp <= 0) {
-                    currentPlayer.alive = false;
+                sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
+                if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
+                    currentPlayer.alive = false; // 사망 처리
                     sendtoall(currentPlayer.userName + " has died.");
                     appendLog(currentPlayer.userName + " has died.");
                     sendtoall("Game Over");
                     appendLog("Game Over");
-                    return;
+                    return; // 게임 종료
                 }
 
-                sendUpdateToAllClients(x, y, check);
+                sendUpdateToAllClients(x, y, check); // 모든 클라이언트에게 업데이트된 좌표와 값을 전송
 
-                currentPlayer.turn = false;
-                currentPlayer.x = -1;
-                currentPlayer.y = -1;
+                updateHpDisplay(); // HP 표시 업데이트
+
+                currentPlayer.turn = false; // 현재 플레이어의 턴 종료
+                currentPlayer.x = -1; // x 값을 초기화
+                currentPlayer.y = -1; // y 값을 초기화
                 currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
                 clients.get(currentPlayerIndex).turn = true;
                 sendTurnMessage();
@@ -207,11 +230,13 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 모든 클라이언트에게 업데이트된 좌표와 값을 전송하는 메서드
     private void sendUpdateToAllClients(int x, int y, int value) {
         String message = "UPDATE:" + x + "," + y + "," + value;
         sendtoall(message);
     }
 
+    // 선택된 난이도를 설정하고 모든 클라이언트에게 알리는 메서드
     public void setDifficulty(String difficulty) {
         selectedDifficulty = difficulty;
         sendtoall("난이도 선택이 완료되었습니다. 선택된 난이도는 " + selectedDifficulty + "입니다.");
@@ -220,6 +245,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 게임 설정 값을 설정하는 메서드
     private void setGameSettings(String difficulty) {
         if (difficulty.equals("Beginner")) {
             width = 5;
@@ -234,9 +260,10 @@ public class SubmarineServer extends JFrame {
             num_mine = 8;
             num_trs = 10;
         }
-        map = new Map(width, num_trs);
+        map = new Map(width, num_trs); // SubmarineMap으로 수정
     }
 
+    // 클라이언트들에게 설정 값을 전송하는 메서드
     private void sendSettingsToClients() {
         String settings = "SETTINGS:" + width + "," + num_mine;
         for (Client c : clients) {
@@ -244,6 +271,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 지뢰 위치 입력을 클라이언트들에게 요청하는 메서드
     private void promptMinesPlacement() {
         for (Client c : clients) {
             c.send("Please set your mine positions.");
@@ -260,6 +288,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 모든 클라이언트로부터 지뢰 위치를 받았는지 확인하는 메서드
     private boolean allMinesReceived() {
         for (Client c : clients) {
             if (c.mines == null || c.mines.length != num_mine) {
@@ -269,6 +298,7 @@ public class SubmarineServer extends JFrame {
         return true;
     }
 
+    // 모든 클라이언트에게 메시지를 전송하는 메서드
     public void sendtoall(String msg) {
         for (Client c : clients) {
             c.send(msg);
@@ -284,6 +314,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 클라이언트의 능력을 저장하는 메서드
     public void savePlayerAbility(Client client, String ability) {
         if (!playerAbilities.containsKey(client)) {
             playerAbilities.put(client, new ArrayList<>());
@@ -295,6 +326,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 모든 플레이어가 능력을 선택했는지 확인하는 메서드
     public boolean allPlayersChoseAbility() {
         for (Client client : clients) {
             if (!playerAbilities.containsKey(client) || playerAbilities.get(client).isEmpty()) {
@@ -304,6 +336,28 @@ public class SubmarineServer extends JFrame {
         return true;
     }
 
+    // HP 표시를 업데이트하는 메서드
+    public void updateHpDisplay() {
+        String player1Hp = "Player 1: " + "❤️ ".repeat(Math.max(0, clients.get(0).hp));
+        String player2Hp = "Player 2: " + "❤️ ".repeat(Math.max(0, clients.get(1).hp));
+
+        player1HpLabel.setText(player1Hp);
+        player2HpLabel.setText(player2Hp);
+    }
+
+    // 로그를 추가하는 메서드
+    public void appendLog(String message) {
+        if (clients.size() > 0 && clients.get(0) != null) {
+            player1LogArea.append(message + "\n");
+            player1LogArea.setCaretPosition(player1LogArea.getDocument().getLength());
+        }
+        if (clients.size() > 1 && clients.get(1) != null) {
+            player2LogArea.append(message + "\n");
+            player2LogArea.setCaretPosition(player2LogArea.getDocument().getLength());
+        }
+    }
+
+    // 클라이언트 클래스
     public class Client extends Thread {
         Socket socket;
         PrintWriter out = null;
@@ -311,33 +365,37 @@ public class SubmarineServer extends JFrame {
         ObjectOutputStream objectOutput = null;
         ObjectInputStream objectInput = null;
         String userName = null;
-        String[][] mines = null;
-        int x = -1, y = -1;
-        int hp = 3;
-        boolean alive = true;
+        String[][] mines = null; // 클라이언트가 설정한 지뢰 위치
+        int x = -1, y = -1; // 초기값을 -1로 설정
+        int hp = 3; // 기본 HP 설정
+        boolean alive = true; // 클라이언트 생존 여부
         boolean firstTime = true;
-        public boolean turn = false;
+        public boolean turn = false; // 클라이언트 턴 여부
+
+        int treasuresFound = 0; // 찾은 보물 개수
+        int minesHit = 0; // 밟은 지뢰 개수
 
         public Client(Socket socket) throws IOException, ClassNotFoundException {
             this.socket = socket;
+            // 클라이언트 초기 설정
             try {
                 objectOutput = new ObjectOutputStream(socket.getOutputStream());
-                objectOutput.flush();
+                objectOutput.flush(); // flush() 추가
                 objectInput = new ObjectInputStream(socket.getInputStream());
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
                 userName = (String) objectInput.readObject();
-                appendLog("Received username: " + userName);
+                appendLog("Received username: " + userName); // 예외 발생 가능 부분 디버그 추가
                 appendLog(userName + " joins from " + socket.getInetAddress());
                 send("wait for other player..");
             } catch (IOException | ClassNotFoundException e) {
                 appendLog("Error during client initialization: " + e.getMessage());
-                e.printStackTrace();
+                e.printStackTrace();  // 스택 트레이스 출력
                 throw e;
             }
 
-            start();
+            start(); // 쓰레드 시작
         }
 
         @Override
@@ -350,15 +408,17 @@ public class SubmarineServer extends JFrame {
                         appendLog(userName + " disconnected.");
                         break;
                     }
-                    appendLog("Received from " + userName + ": " + msg);
+                    appendLog("Received from " + userName + ": " + msg); // 디버그 메시지 추가
                     if (msg.startsWith("MOVE:")) {
                         String[] parts = msg.substring(5).split(",");
                         if (parts.length == 2 && isNumeric(parts[0]) && isNumeric(parts[1])) {
                             x = Integer.parseInt(parts[0]);
                             y = Integer.parseInt(parts[1]);
                             synchronized (this) {
-                                this.notifyAll();
+                                this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
                             }
+                        } else {
+                            send("Invalid input. Please enter valid coordinates.");
                         }
                     } else if (msg.startsWith("DIFFICULTY:")) {
                         String difficulty = msg.substring(11);
@@ -386,11 +446,13 @@ public class SubmarineServer extends JFrame {
                     } else if (msg.startsWith("HEALING:")) {
                         updateHP(userName, 1);
                     } else if (msg.startsWith("STEAL:")) {
-                        if (turn == true) {
+                        if (turn) {
                             turn = false;
                             currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
                             sendTurnMessage();
                         }
+                    } else if (msg.equals("REQUEST_STATS")) {
+                        sendGameStatistics();
                     } else {
                         if (turn && alive) {
                             try {
@@ -401,11 +463,14 @@ public class SubmarineServer extends JFrame {
                                     send("ok");
                                     turn = false;
                                     synchronized (this) {
-                                        this.notifyAll();
+                                        this.notifyAll(); // 클라이언트가 x, y 값을 업데이트한 후 알림
                                     }
+                                } else {
+                                    send("Invalid input. Please enter valid coordinates.");
                                 }
                             } catch (NumberFormatException e) {
                                 appendLog("Invalid input: " + msg);
+                                send("Invalid input. Please enter valid coordinates.");
                             }
                         }
                     }
@@ -416,16 +481,16 @@ public class SubmarineServer extends JFrame {
             }
         }
 
+        // 플레이어의 HP를 업데이트하는 메서드
         private void updateHP(String userName, int delta) {
             for (Client c : clients) {
                 if (c.userName.equals(userName)) {
                     c.hp += delta;
-                    sendtoall(c.userName + " HP: " + c.hp);
-                    updatePlayerLabels();
-                    if (c.hp <= 0) {
+                    sendtoall(c.userName + " HP: " + c.hp); // HP 정보 전송
+                    if (c.hp <= 0) { // 플레이어가 사망했는지 확인
                         c.alive = false;
-                        sendtoall(c.userName + " has died.");
-                        sendtoall("Game Over");
+                        sendtoall(c.userName + " has died."); // 사망 정보 전송
+                        sendtoall("Game Over"); // 게임 종료 정보 전송
                         appendLog("Game Over");
                         break;
                     }
@@ -433,43 +498,21 @@ public class SubmarineServer extends JFrame {
             }
         }
 
+        // 클라이언트에게 메시지를 전송하는 메서드
         public void send(String msg) {
             out.println(msg);
         }
 
+        // 문자열이 숫자인지 확인하는 메서드
         private boolean isNumeric(String str) {
             return str != null && str.matches("\\d+");
         }
-    }
 
-    // 로그를 추가하는 메소드
-    private void appendLog(String message) {
-        SwingUtilities.invokeLater(() -> {
-            logArea.append(message + "\n");
-            logArea.setCaretPosition(logArea.getDocument().getLength());
-        });
-    }
-
-    // 플레이어 정보를 업데이트하는 메소드
-    private void updatePlayerLabels() {
-        SwingUtilities.invokeLater(() -> {
-            if (clients.size() > 0) {
-                Client player1 = clients.get(0);
-                player1Label.setText(player1.userName + ": " + getHeartString(player1.hp));
+        private void sendGameStatistics() {
+            for (Client c : clients) {
+                String stats = c.treasuresFound + "," + c.minesHit;
+                c.send("STATS:" + stats);
             }
-            if (clients.size() > 1) {
-                Client player2 = clients.get(1);
-                player2Label.setText(player2.userName + ": " + getHeartString(player2.hp));
-            }
-        });
-    }
-
-    // 하트 모양으로 HP를 표시하는 메소드
-    private String getHeartString(int hp) {
-        StringBuilder hearts = new StringBuilder();
-        for (int i = 0; i < hp; i++) {
-            hearts.append("❤️");
         }
-        return hearts.toString();
     }
 }
