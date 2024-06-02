@@ -125,37 +125,27 @@ public class SubmarineServer {
                         wait();
                     }
                 }
+                
                 Client currentPlayer = clients.get(currentPlayerIndex);
-
+                
                 synchronized (currentPlayer) {
                     while (currentPlayer.x == -1 || currentPlayer.y == -1) {
                         currentPlayer.wait(); // x, y 값이 업데이트 될 때까지 대기
                     }
                 }
-
+                
+                synchronized (this) {
+                    while (!clients.get(currentPlayerIndex).turn) {
+                        wait();
+                    }
+                }
+                
                 int x = currentPlayer.x;
                 int y = currentPlayer.y;
 
                 int check = map.checkMine(x, y); // 지뢰 체크
 
                 map.printMap(map.mineMap);
-
-//                if (check >= 0) {
-//                    System.out.println(currentPlayer.userName + " hit at (" + x + " , " + y + ")");
-//                    map.updateMap(x, y); // 맵 업데이트
-//                    currentPlayer.hp -= 1; // 플레이어 HP 감소
-//                    sendtoall(currentPlayer.userName + " HP: " + currentPlayer.hp); // HP 정보 전송
-//                    if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
-//                        currentPlayer.alive = false; // 사망 처리
-//                        sendtoall(currentPlayer.userName + " has died.");
-//                        System.out.println(currentPlayer.userName + " has died.");
-//                        sendtoall("Game Over");
-//                        System.out.println("Game Over");
-//                        return; // 게임 종료
-//                    }
-//                } else {
-//                    System.out.println(currentPlayer.userName + " miss at (" + x + " , " + y + ")");
-//                }
 
                 if (check == 99) {
                     sendtoall(currentPlayer.userName + "보물발견!");
@@ -394,14 +384,12 @@ public class SubmarineServer {
                         }
                     } else if (msg.startsWith("HEALING:")) {
                         updateHP(userName, 1);
-                    } else if (msg.startsWith("STEAL:")) {
-                        if (turn == true) {
-                            turn = false;
-                            currentPlayerIndex = (currentPlayerIndex + 1) % clients.size();
-                            sendTurnMessage();
-                        }
                     } else if (msg.equals("REQUEST_STATS")) {
                         sendGameStatistics();
+                    } else if (msg.startsWith("MINECHECK:")) {
+                    	sendMineCheckResult(msg.substring(10));
+                    } else if (msg.startsWith("BUTTONBLACK:")) {
+                        sendButtonColorBlack(msg.substring(12));
                     } else {
                         if (turn && alive) {
                             try {
@@ -456,6 +444,39 @@ public class SubmarineServer {
         private boolean isNumeric(String str) {
             return str != null && str.matches("\\d+");
         }
+        
+        private void sendMineCheckResult(String msg) {
+        	boolean f = false;
+        	String parts[] = msg.split(",");
+        	int x = Integer.parseInt(parts[0]);
+        	int y = Integer.parseInt(parts[1]);
+        	for (Client c : clients) {
+            	if (map.mineMap[x][y].equals(c.userName.substring(0, 1))) {
+            		f = true;
+            		break;
+            	}
+        	}
+        	
+        	for (Client c : clients) {
+                if (c.userName.equals(userName)) {
+                	String result = "MINECHECK:" + x + "," + y + "," + (f ? "1" : "0");
+                    c.send("MINECHECK:" + x + "," + y + "," + (f ? "1" : "0"));
+                    System.out.println("Sending exploration result to " + c.userName + ": " + result);
+                } else {
+                	System.out.println("Error");
+                }
+            }
+        }
+        
+        private void sendButtonColorBlack(String msg) {
+        	String parts[] = msg.split(",");
+        	int x = Integer.parseInt(parts[0]);
+        	int y = Integer.parseInt(parts[1]);
+        	for (Client c : clients) {
+                c.send("BUTTONBLACK:" + x + "," + y);
+        	}
+        }
+        
         
         private void sendGameStatistics() {
         	for (Client c : clients) {
