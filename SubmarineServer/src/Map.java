@@ -46,6 +46,16 @@ public class Map {
         }
     }
 
+    public void deployTrs() {
+//        System.out.println("mine positions");
+        for (int i = 0; i < num_trs; i++) {
+            int x = trsPosition.get(i) / width;
+            int y = trsPosition.get(i) % width;
+//            System.out.println(x+", "+y);
+            mineMap[x][y] = "T"; // 보물 위치를 "T"로 설정
+            displayMap[x][y] = "s"; // 보물 있는 위치 표시
+        }
+    }
     // 특정 위치에 지뢰가 있는지 확인하는 메서드
     public int checkMine(int r, int c) {
         if (displayMap[r][c] == "s") { // 보물이 있는지 확인
