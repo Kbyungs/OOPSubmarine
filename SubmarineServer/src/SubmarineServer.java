@@ -451,11 +451,11 @@ public class SubmarineServer extends JFrame {
         SwingUtilities.invokeLater(() -> {
             if (clients.size() > 0) {
                 Client player1 = clients.get(0);
-                player1Label.setText("Player 1: " + player1.userName + " (HP: " + player1.hp + ")");
+                player1Label.setText(player1.userName + ": " + player1.hp + " HP");
             }
             if (clients.size() > 1) {
                 Client player2 = clients.get(1);
-                player2Label.setText("Player 2: " + player2.userName + " (HP: " + player2.hp + ")");
+                player2Label.setText(player2.userName + ": " + player2.hp + " HP");
             }
         });
     }
