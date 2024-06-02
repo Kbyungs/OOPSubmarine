@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.List; // 명시적으로 java.util.List를 임포트
+import java.util.List; // 명확히 java.util.List를 임포트
 
 public class SubmarineServer extends JFrame {
     public static int inPort = 9999; // 서버가 수신할 포트 번호
@@ -110,6 +110,9 @@ public class SubmarineServer extends JFrame {
         clients.get(0).send("you are the host"); // 방장에게 난이도 선택 메시지 전송
         clients.get(1).send("waiting for the host to select difficulty..");
 
+        player1HpLabel.setText(clients.get(0).userName + " : ❤️ ❤️ ❤️");
+        player2HpLabel.setText(clients.get(1).userName + " : ❤️ ❤️ ❤️");
+
         // 플레이어 1의 난이도 선택 과정 진행
         new java.util.Timer().schedule(new java.util.TimerTask() {
             @Override
@@ -210,7 +213,7 @@ public class SubmarineServer extends JFrame {
 
                 sendtoall(result); // 결과 정보 전송
                 appendLog(result); // 로그에 결과 추가
-                sendtoall("HP:" + currentPlayer.hp); // HP 정보 전송
+                sendHpUpdateToClients(); // HP 정보 전송
                 if (currentPlayer.hp <= 0) { // 플레이어가 사망했는지 확인
                     currentPlayer.alive = false; // 사망 처리
                     sendtoall(currentPlayer.userName + " has died.");
@@ -342,10 +345,16 @@ public class SubmarineServer extends JFrame {
         return true;
     }
 
+    // 두 플레이어의 HP를 클라이언트들에게 전송하는 메서드
+    public void sendHpUpdateToClients() {
+        String hpMessage = "HP:" + clients.get(0).userName + "," + clients.get(0).hp + "," + clients.get(1).userName + "," + clients.get(1).hp;
+        sendtoall(hpMessage);
+    }
+
     // HP 표시를 업데이트하는 메서드
     public void updateHpDisplay() {
-        String player1Hp = "Player 1: " + "❤️ ".repeat(Math.max(0, clients.get(0).hp));
-        String player2Hp = "Player 2: " + "❤️ ".repeat(Math.max(0, clients.get(1).hp));
+        String player1Hp = clients.get(0).userName + " : " + "❤️ ".repeat(Math.max(0, clients.get(0).hp));
+        String player2Hp = clients.get(1).userName + " : " + "❤️ ".repeat(Math.max(0, clients.get(1).hp));
 
         player1HpLabel.setText(player1Hp);
         player2HpLabel.setText(player2Hp);
@@ -492,7 +501,7 @@ public class SubmarineServer extends JFrame {
             for (Client c : clients) {
                 if (c.userName.equals(userName)) {
                     c.hp += delta;
-                    sendtoall("HP:" + c.hp); // HP 정보 전송
+                    sendHpUpdateToClients(); // HP 정보 전송
                     if (c.hp <= 0) { // 플레이어가 사망했는지 확인
                         c.alive = false;
                         sendtoall(c.userName + " has died."); // 사망 정보 전송
