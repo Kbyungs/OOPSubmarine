@@ -1,3 +1,5 @@
+// 클라이언트 파일
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -139,6 +141,9 @@ public class SubmarineClient extends JFrame {
                                 }
                             } else if (message.startsWith("HP:")) { // HP 정보 수신 시
                                 updateHpDisplay(message.substring(3));
+                            } else if (message.startsWith("Winner:")) { // 승리 메시지 수신 시
+                                showGameResultDialog(message);
+                                break; // 게임 종료 시 루프 탈출
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 textArea.setCaretPosition(textArea.getDocument().getLength()); // 스크롤 자동 아래로
@@ -546,6 +551,12 @@ public class SubmarineClient extends JFrame {
 
         player1HpLabel.setText(player1Name + " : " + "❤️ ".repeat(Math.max(0, player1Hp)));
         player2HpLabel.setText(player2Name + " : " + "❤️ ".repeat(Math.max(0, player2Hp)));
+    }
+
+    // 게임 결과를 표시하는 다이얼로그
+    private void showGameResultDialog(String message) {
+        JOptionPane.showMessageDialog(this, message, "Game Result", JOptionPane.INFORMATION_MESSAGE);
+        showGameEndDialog();
     }
 
     public static void main(String[] args) {
