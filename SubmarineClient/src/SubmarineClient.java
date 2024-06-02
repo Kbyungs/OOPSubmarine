@@ -37,7 +37,10 @@ public class SubmarineClient extends JFrame {
     // 버튼의 활성화/비활성화 상태를 추적하기 위한 배열
     private boolean[][] buttonStates;
 
-    private JLabel hpLabel; // HP를 표시할 라벨
+    private JLabel player1HpLabel; // Player 1의 HP를 표시할 라벨
+    private JLabel player2HpLabel; // Player 2의 HP를 표시할 라벨
+    private String player1Name; // Player 1의 이름
+    private String player2Name; // Player 2의 이름
 
     public SubmarineClient() {
         // GUI 구성 요소 초기화
@@ -64,9 +67,13 @@ public class SubmarineClient extends JFrame {
         add(new JScrollPane(textArea), BorderLayout.CENTER); // 텍스트 영역을 중앙에 추가
         add(abilityUseButton, BorderLayout.EAST); // 채팅창 옆에 능력 사용 버튼 추가
 
-        // 상단 패널에 HP 표시 라벨 추가
-        hpLabel = new JLabel("HP: ❤️ ❤️ ❤️");
-        add(hpLabel, BorderLayout.NORTH);
+        // 상단 패널에 두 플레이어의 HP 표시 라벨 추가
+        JPanel hpPanel = new JPanel(new GridLayout(1, 2));
+        player1HpLabel = new JLabel("Player 1: ❤️ ❤️ ❤️");
+        player2HpLabel = new JLabel("Player 2: ❤️ ❤️ ❤️");
+        hpPanel.add(player1HpLabel);
+        hpPanel.add(player2HpLabel);
+        add(hpPanel, BorderLayout.NORTH);
 
         // 창 설정
         setTitle("MZ뢰찾기");
@@ -131,7 +138,7 @@ public class SubmarineClient extends JFrame {
                                     enableAllButtons();
                                 }
                             } else if (message.startsWith("HP:")) { // HP 정보 수신 시
-                                updateHpDisplay(message);
+                                updateHpDisplay(message.substring(3));
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 textArea.setCaretPosition(textArea.getDocument().getLength()); // 스크롤 자동 아래로
@@ -531,9 +538,14 @@ public class SubmarineClient extends JFrame {
 
     // HP 표시를 업데이트하는 메서드
     private void updateHpDisplay(String message) {
-        String[] parts = message.split(":");
-        int hp = Integer.parseInt(parts[1].trim());
-        hpLabel.setText("HP: " + "❤️ ".repeat(hp));
+        String[] parts = message.split(",");
+        String player1Name = parts[0];
+        int player1Hp = Integer.parseInt(parts[1].trim());
+        String player2Name = parts[2];
+        int player2Hp = Integer.parseInt(parts[3].trim());
+
+        player1HpLabel.setText(player1Name + " : " + "❤️ ".repeat(Math.max(0, player1Hp)));
+        player2HpLabel.setText(player2Name + " : " + "❤️ ".repeat(Math.max(0, player2Hp)));
     }
 
     public static void main(String[] args) {
