@@ -130,6 +130,8 @@ public class SubmarineClient extends JFrame {
                                 if (myTurn) {
                                     enableAllButtons();
                                 }
+                            } else if (message.startsWith("HP:")) { // HP 정보 수신 시
+                                updateHpDisplay(message);
                             } else {
                                 textArea.append(message + "\n"); // 일반 메시지 텍스트 영역에 추가
                                 textArea.setCaretPosition(textArea.getDocument().getLength()); // 스크롤 자동 아래로
@@ -140,9 +142,6 @@ public class SubmarineClient extends JFrame {
                                 }
                                 if (message.contains("능력을 선택해주세요")) { // 능력 선택 메시지 수신 시
                                     showAbilitySelection(); // 능력 선택 창 표시
-                                }
-                                if (message.startsWith("HP:")) { // HP 정보 수신 시
-                                    updateHpDisplay(message);
                                 }
                             }
                         }
@@ -532,8 +531,9 @@ public class SubmarineClient extends JFrame {
 
     // HP 표시를 업데이트하는 메서드
     private void updateHpDisplay(String message) {
-        String hp = message.substring(3).trim();
-        hpLabel.setText("HP: " + "❤️ ".repeat(Integer.parseInt(hp)));
+        String[] parts = message.split(":");
+        int hp = Integer.parseInt(parts[1].trim());
+        hpLabel.setText("HP: " + "❤️ ".repeat(hp));
     }
 
     public static void main(String[] args) {
