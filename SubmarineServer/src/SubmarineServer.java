@@ -37,9 +37,10 @@ public class SubmarineServer extends JFrame {
     public SubmarineServer() {
         setTitle("Submarine Server");
         setSize(600, 400);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE); // x 버튼을 눌렀을 때 종료되도록 설정
         setLayout(new BorderLayout());
 
+        // 상단 패널에 플레이어 정보를 표시하는 레이블 추가
         JPanel topPanel = new JPanel(new GridLayout(1, 2));
         player1Label = new JLabel("Player 1: ");
         player2Label = new JLabel("Player 2: ");
@@ -47,6 +48,7 @@ public class SubmarineServer extends JFrame {
         topPanel.add(player2Label);
         add(topPanel, BorderLayout.NORTH);
 
+        // 게임 이벤트를 로그로 표시하는 텍스트 영역 추가
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setLineWrap(true);
@@ -59,15 +61,15 @@ public class SubmarineServer extends JFrame {
     }
 
     public void createServer() throws Exception {
-        appendLog("Server start running...");
+        appendLog("서버 시작 중...");
         ServerSocket server = new ServerSocket(inPort);
 
         numPlayer = 0;
         while (numPlayer < maxPlayer) {
             try {
-                appendLog("Waiting for a client to connect...");
+                appendLog("클라이언트 연결 대기 중...");
                 Socket socket = server.accept();
-                appendLog("Client connected from " + socket.getInetAddress());
+                appendLog(socket.getInetAddress() + "에서 클라이언트 연결됨");
 
                 try {
                     Client c = new Client(socket);
@@ -78,12 +80,12 @@ public class SubmarineServer extends JFrame {
                     appendLog(numPlayer + "/" + maxPlayer + " players join");
                     updatePlayerLabels();
                 } catch (IOException | ClassNotFoundException e) {
-                    appendLog("Error during client initialization: " + e.getMessage());
+                    appendLog("클라이언트 초기화 중 오류 발생: " + e.getMessage());
                     e.printStackTrace();
                     socket.close();
                 }
             } catch (IOException e) {
-                appendLog("Failed to connect to client: " + e.getMessage());
+                appendLog("클라이언트 연결 실패: " + e.getMessage());
             }
         }
 
@@ -440,6 +442,7 @@ public class SubmarineServer extends JFrame {
         }
     }
 
+    // 로그를 추가하는 메소드
     private void appendLog(String message) {
         SwingUtilities.invokeLater(() -> {
             logArea.append(message + "\n");
@@ -447,16 +450,26 @@ public class SubmarineServer extends JFrame {
         });
     }
 
+    // 플레이어 정보를 업데이트하는 메소드
     private void updatePlayerLabels() {
         SwingUtilities.invokeLater(() -> {
             if (clients.size() > 0) {
                 Client player1 = clients.get(0);
-                player1Label.setText(player1.userName + ": " + player1.hp + " HP");
+                player1Label.setText(player1.userName + ": " + getHeartString(player1.hp));
             }
             if (clients.size() > 1) {
                 Client player2 = clients.get(1);
-                player2Label.setText(player2.userName + ": " + player2.hp + " HP");
+                player2Label.setText(player2.userName + ": " + getHeartString(player2.hp));
             }
         });
+    }
+
+    // 하트 모양으로 HP를 표시하는 메소드
+    private String getHeartString(int hp) {
+        StringBuilder hearts = new StringBuilder();
+        for (int i = 0; i < hp; i++) {
+            hearts.append("❤️");
+        }
+        return hearts.toString();
     }
 }
